@@ -6,11 +6,36 @@
   "labels": ["dependencies"],
   "addLabels": ["{{updateType}}", "{{datasource}}"],
   "dependencyDashboard": true,
-  "prConcurrentLimit": 30,
-  "prHourlyLimit": 25,
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 4,
+  "branchConcurrentLimit": 5,
+  "commitHourlyLimit": 8,
   "automerge": true,
   "automergeType": "pr",
   "packageRules": [
+    {
+      "description": "One branch per run for every non-major update, in every ecosystem. Omitting matchManagers is deliberate: the managers matcher imposes no constraint when it is absent, so this covers gomod, npm, cargo, pep621, swift, terraform, helm and the rest without enumeration",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-minor-patch"
+    },
+    {
+      "description": "Digest and pin moves keep the tag, so they are a rebuilt layer rather than an upgrade decision and belong in one branch of their own. They are a separate rule because the non-major group above matches only minor and patch",
+      "matchPackageNames": ["*"],
+      "matchUpdateTypes": ["digest", "pin", "pinDigest"],
+      "groupName": "digests and pins",
+      "groupSlug": "digests"
+    },
+    {
+      "description": "A pre-1.0 package may break on a minor and semver permits it, so it leaves the automerging group into one of its own. WARNING: it must leave rather than merely lose automerge, because a branch automerges only when every upgrade in it does, so a single pre-1.0 member would park the whole group",
+      "matchUpdateTypes": ["minor"],
+      "matchCurrentVersion": "/^0\\./",
+      "groupName": "pre-1.0 minor updates",
+      "groupSlug": "pre-1-0-minor",
+      "automerge": false,
+      "addLabels": ["needs-decision"]
+    },
     {
       "description": "A major upgrade is a decision, not a refresh, so it waits to be asked for on the dashboard",
       "matchUpdateTypes": ["major"],
@@ -19,8 +44,14 @@
       "addLabels": ["needs-decision"]
     },
     {
+      "description": "Anything that will merge itself says so on the pull request. Minor is qualified because the pre-1.0 rule above withholds automerge from it",
+      "matchUpdateTypes": ["patch", "digest", "pin", "pinDigest"],
+      "addLabels": ["automerge"]
+    },
+    {
       "description": "Anything that will merge itself says so on the pull request",
-      "matchUpdateTypes": ["minor", "patch", "digest", "pin"],
+      "matchUpdateTypes": ["minor"],
+      "matchCurrentVersion": "!/^0\\./",
       "addLabels": ["automerge"]
     }
   ]
