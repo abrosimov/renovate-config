@@ -1,0 +1,45 @@
+name: validate
+
+# A broken preset is not discovered here. It is discovered by every repository
+# that extends it, as a configuration error on its dependency dashboard, with
+# updates parked until somebody notices. This is the gate that keeps it local.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  # The preset is static; Renovate is not. Options get renamed and removed on
+  # its majors, so the breakage arrives without a commit. The weekly run is
+  # what catches that, and it is the reason the validator is not pinned.
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  config:
+    name: config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+      # Renovate's engines field tracks the current Node LTS and npx resolves
+      # the newest release that the installed Node satisfies, so pinning a Node
+      # version here would silently pin the validator to an older Renovate and
+      # defeat the scheduled run above.
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: lts/*
+      # --strict fails on anything the validator would otherwise only warn
+      # about, deprecated options among it. WARNING: a file passed by path is
+      # validated as a global configuration, which is a superset of the
+      # repository options, so a self-hosted-only option would pass here and
+      # still be rejected in a consumer. Option names, manager names, regexes
+      # and the resolution of every preset in `extends` are checked either way,
+      # and those are what actually break the fleet.
+      - run: npx --yes --package renovate -- renovate-config-validator --strict default.json

@@ -104,6 +104,26 @@ A fix from either channel is deliberately ungrouped and unthrottled, so it
 cannot sit behind an ecosystem branch waiting for something unrelated. The
 dashboard lists outstanding advisories in full.
 
+## Its own checks
+
+A mistake in `default.json` is not found in this repository. It is found by
+every repository that extends it, as a configuration error on a dependency
+dashboard, with updates parked until somebody reads it. `.github/workflows/validate.yml`
+runs `renovate-config-validator --strict` to keep that local: it checks option
+names, manager names and regular expressions, and resolves every preset named
+in `extends`.
+
+It runs on pushes and pull requests, and also once a week on a schedule. The
+weekly run is the one that earns its keep. The preset is static but Renovate is
+not, so an option can be renamed or withdrawn on one of its majors and the
+breakage arrives without a commit to trigger anything. For the same reason the
+validator is deliberately unpinned: the check is only meaningful against the
+version the self-hosted runner is about to use.
+
+The repository also carries its own `renovate.json` pointing at its own preset,
+so the policy is applied to the workflow it just acquired and is exercised
+against live traffic rather than only asserted.
+
 ## Overriding it
 
 A repository that needs something different keeps its own settings beside the
