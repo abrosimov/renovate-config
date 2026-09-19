@@ -1,32 +1,114 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:best-practices",
+    "security:minimumReleaseAgeCrate",
+    "security:minimumReleaseAgePypi"
+  ],
   "timezone": "UTC",
   "branchPrefix": "renovate-",
-  "assignees": ["abrosimov"],
   "labels": ["dependencies"],
-  "addLabels": ["{{updateType}}", "{{datasource}}"],
-  "dependencyDashboard": true,
   "prConcurrentLimit": 10,
   "prHourlyLimit": 4,
-  "branchConcurrentLimit": 5,
-  "commitHourlyLimit": 8,
+
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "minimumReleaseAgeBehaviour": "timestamp-required",
+
   "automerge": true,
-  "automergeType": "pr",
+  "platformAutomerge": true,
+  "automergeStrategy": "squash",
+
+  "postUpdateOptions": ["gomodTidy"],
+
+  "osvVulnerabilityAlerts": true,
+  "dependencyDashboardOSVVulnerabilitySummary": "all",
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "groupName": null,
+    "labels": ["security"],
+    "dependencyDashboardApproval": false,
+    "minimumReleaseAge": null,
+    "prConcurrentLimit": 0
+  },
+
   "packageRules": [
     {
-      "description": "One branch per run for every non-major update, in every ecosystem. Omitting matchManagers is deliberate: the managers matcher imposes no constraint when it is absent, so this covers gomod, npm, cargo, pep621, swift, terraform, helm and the rest without enumeration",
-      "matchPackageNames": ["*"],
+      "description": "One branch per ecosystem rather than one for the whole fleet. A failing check then parks only the ecosystem it belongs to, and a revert names what broke. Grouping by manager also subsumes the monorepo presets that the base configuration brings, because a monorepo's packages all share one ecosystem; those presets are left to decide major, which is where a coordinated bump actually matters",
+      "matchManagers": ["gomod"],
       "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "all non-major dependencies",
-      "groupSlug": "all-minor-patch"
+      "groupName": "go modules",
+      "groupSlug": "gomod",
+      "addLabels": ["gomod"]
     },
     {
-      "description": "Digest and pin moves keep the tag, so they are a rebuilt layer rather than an upgrade decision and belong in one branch of their own. They are a separate rule because the non-major group above matches only minor and patch",
-      "matchPackageNames": ["*"],
+      "description": "Workflow actions move on their own cadence and break the pipeline rather than the product, so they are worth reading apart from application dependencies",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "github actions",
+      "groupSlug": "github-actions",
+      "addLabels": ["github-actions"]
+    },
+    {
+      "description": "A base image carries an operating system, not a library, so its blast radius is the runtime rather than the call graph",
+      "matchManagers": ["dockerfile", "docker-compose", "devcontainer"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "container images",
+      "groupSlug": "containers",
+      "addLabels": ["docker"]
+    },
+    {
+      "description": "Every Python manager is named rather than matched on a category, because extraction happens before categories are known and the fleet mixes pyproject, requirements and setup.cfg in the same repository",
+      "matchManagers": [
+        "pep621",
+        "pep723",
+        "poetry",
+        "pipenv",
+        "pip_requirements",
+        "pip-compile",
+        "setup-cfg"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "python packages",
+      "groupSlug": "python",
+      "addLabels": ["python"]
+    },
+    {
+      "matchManagers": ["npm", "bun", "deno"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "javascript packages",
+      "groupSlug": "javascript",
+      "addLabels": ["javascript"]
+    },
+    {
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "rust crates",
+      "groupSlug": "cargo",
+      "addLabels": ["rust"]
+    },
+    {
+      "matchManagers": ["ansible", "ansible-galaxy"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "ansible collections",
+      "groupSlug": "ansible",
+      "addLabels": ["ansible"]
+    },
+    {
+      "description": "Toolchain pins decide what a contributor's machine runs, not what the product ships, so they are their own branch",
+      "matchManagers": ["pre-commit", "mise", "asdf", "nix"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "developer tooling",
+      "groupSlug": "tooling",
+      "addLabels": ["tooling"]
+    },
+    {
+      "description": "Digest and pin moves keep the tag, so they are a rebuilt layer rather than an upgrade decision and belong in one branch of their own. The ageing requirement is cleared here deliberately: a digest carries no release timestamp to age against, and minimumReleaseAgeBehaviour: timestamp-required would otherwise hold every one of them indefinitely",
       "matchUpdateTypes": ["digest", "pin", "pinDigest"],
       "groupName": "digests and pins",
-      "groupSlug": "digests"
+      "groupSlug": "digests",
+      "minimumReleaseAge": null,
+      "addLabels": ["automerge"]
     },
     {
       "description": "A pre-1.0 package may break on a minor and semver permits it, so it leaves the automerging group into one of its own. WARNING: it must leave rather than merely lose automerge, because a branch automerges only when every upgrade in it does, so a single pre-1.0 member would park the whole group",
@@ -35,22 +117,25 @@
       "groupName": "pre-1.0 minor updates",
       "groupSlug": "pre-1-0-minor",
       "automerge": false,
+      "assignees": ["abrosimov"],
       "addLabels": ["needs-decision"]
     },
     {
-      "description": "A major upgrade is a decision, not a refresh, so it waits to be asked for on the dashboard",
+      "description": "A major upgrade is a decision, not a refresh, so it waits to be asked for on the dashboard and is never folded into an ecosystem group. The longer quarantine is the same reasoning applied to time: a major carries the breaking change by definition, so it gets the far end of the window rather than the near one",
       "matchUpdateTypes": ["major"],
+      "minimumReleaseAge": "14 days",
       "automerge": false,
       "dependencyDashboardApproval": true,
+      "assignees": ["abrosimov"],
       "addLabels": ["needs-decision"]
     },
     {
-      "description": "Anything that will merge itself says so on the pull request. Minor is qualified because the pre-1.0 rule above withholds automerge from it",
-      "matchUpdateTypes": ["patch", "digest", "pin", "pinDigest"],
+      "description": "Anything that will merge itself says so on the pull request. Assignees are withheld from these on purpose: a pull request that merges itself needs no owner, and only the branches that ask for a decision are worth a notification",
+      "matchUpdateTypes": ["patch"],
       "addLabels": ["automerge"]
     },
     {
-      "description": "Anything that will merge itself says so on the pull request",
+      "description": "Minor is qualified because the pre-1.0 rule above withholds automerge from it",
       "matchUpdateTypes": ["minor"],
       "matchCurrentVersion": "!/^0\\./",
       "addLabels": ["automerge"]
