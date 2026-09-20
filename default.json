@@ -17,7 +17,7 @@
 
   "automerge": true,
   "platformAutomerge": true,
-  "automergeStrategy": "merge",
+  "automergeStrategy": "merge-commit",
 
   "postUpdateOptions": ["gomodTidy"],
 

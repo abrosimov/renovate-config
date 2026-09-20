@@ -76,9 +76,14 @@ packages together actually matters.
 
 - Minor, patch, digest and pin updates merge themselves once their checks pass
   and the quarantine has elapsed, and carry an `automerge` label saying so.
-  Merging goes through the platform's native auto-merge with a merge-commit
-  strategy, which requires "Allow auto-merge" and "Allow merge commits" to be
-  enabled in the repository's settings.
+  Merging goes through the platform's native auto-merge, which requires "Allow
+  auto-merge" to be enabled in the repository's settings. The strategy is
+  `merge-commit`: no squashing, so an upgrade keeps the commit Renovate wrote.
+  WARNING: GitHub's native auto-merge takes its merge method from the
+  repository's own settings and prefers squash wherever squash is allowed, so
+  `automergeStrategy` only decides the fallback path, where Renovate merges the
+  pull request itself through the API. A repository that must produce merge
+  commits has to disable squash merging in its settings as well.
 - A repository with no checks at all has nothing to wait for, so there such an
   update merges as soon as the quarantine is over.
 - A pre-1.0 package may break on a minor and semver permits it, so pre-1.0
