@@ -17,7 +17,7 @@
 
   "automerge": true,
   "platformAutomerge": true,
-  "automergeStrategy": "squash",
+  "automergeStrategy": "merge",
 
   "postUpdateOptions": ["gomodTidy"],
 

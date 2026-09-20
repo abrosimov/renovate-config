@@ -76,8 +76,9 @@ packages together actually matters.
 
 - Minor, patch, digest and pin updates merge themselves once their checks pass
   and the quarantine has elapsed, and carry an `automerge` label saying so.
-  Merging goes through the platform's native auto-merge with a squash strategy,
-  which requires "Allow auto-merge" to be enabled in the repository's settings.
+  Merging goes through the platform's native auto-merge with a merge-commit
+  strategy, which requires "Allow auto-merge" and "Allow merge commits" to be
+  enabled in the repository's settings.
 - A repository with no checks at all has nothing to wait for, so there such an
   update merges as soon as the quarantine is over.
 - A pre-1.0 package may break on a minor and semver permits it, so pre-1.0
