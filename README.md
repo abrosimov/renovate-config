@@ -11,12 +11,37 @@ record that Renovate is enabled while the policy itself stays central:
 ```json
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>abrosimov/renovate-config"]
+  "extends": ["github>abrosimov/renovate-config#v1.0.0"]
 }
 ```
 
 `github>abrosimov/renovate-config` resolves to `default.json` in this
-repository's root.
+repository's root, and the `#v1.0.0` suffix pins that resolution to a tag. See
+`Versioning` below for why the suffix is not optional.
+
+## Versioning
+
+A repository extends a tag, never the bare branch. The bare form resolves to
+whatever `master` holds at the moment Renovate runs, which means a change here
+reaches every repository at once, unreviewed and unannounced, and a mistake
+does the same.
+
+`.github/workflows/release.yml` cuts the tags. It is dispatched by hand with a
+`vMAJOR.MINOR.PATCH` version, refuses to run anywhere but `master`, re-runs the
+validator before tagging and rejects a version that already exists, then
+creates the annotated tag and a release with generated notes.
+
+Moving the pin afterwards is Renovate's own work rather than a chore. Its
+`renovate-config` manager reads the `extends` list, recognises a preset that
+names a tag and tracks it against this repository's tags, so a release raises
+an ordinary pull request in every consumer, running that repository's checks
+against the new policy before it applies. Those pull requests skip the
+quarantine, because the change was already reviewed and validated here, and
+they automerge on a minor or a patch like anything else.
+
+That mechanism is also the reason the suffix is not optional: the manager
+skips a preset with no version to compare against, so an unpinned repository
+raises nothing and quietly tracks `master` instead.
 
 ## The base
 
@@ -31,6 +56,14 @@ One component of that base is worth knowing about because it is visible:
 `:pinDevDependencies` changes `rangeStrategy` to `pin` for development
 dependencies, so a repository with a `package.json` sees a one-off wave of
 pinning pull requests the first time it picks this preset up.
+
+Lock files are refreshed rather than left to drift. `gomodTidy` keeps `go.mod`
+honest, `gomodUpdateImportPaths` rewrites the `/vN` import paths a Go major
+demands and restores the `go mod tidy` that Renovate otherwise skips on a
+major, and the npm, pnpm and Yarn dedupe options collapse the duplicate trees
+an upgrade leaves behind. Everything else that carries a lock file — uv, PDM,
+Poetry, Cargo, Bundler, Composer and the rest — updates it through its own
+manager with no option to set.
 
 ## The quarantine
 
@@ -127,7 +160,13 @@ version the self-hosted runner is about to use.
 
 The repository also carries its own `renovate.json` pointing at its own preset,
 so the policy is applied to the workflow it just acquired and is exercised
-against live traffic rather than only asserted.
+against live traffic rather than only asserted. It is the one place that
+extends the branch rather than a tag, because a preset that pinned itself
+would need a release to adopt its own release.
+
+WARNING: `--strict` does not check option values. A misspelt strategy or
+update type passes validation and is then ignored at runtime, so a value read
+off the documentation is worth reading twice.
 
 ## Overriding it
 

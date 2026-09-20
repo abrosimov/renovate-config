@@ -8,8 +8,8 @@
   "timezone": "UTC",
   "branchPrefix": "renovate-",
   "labels": ["dependencies"],
-  "prConcurrentLimit": 10,
-  "prHourlyLimit": 4,
+  "prConcurrentLimit": 25,
+  "prHourlyLimit": 10,
 
   "minimumReleaseAge": "7 days",
   "internalChecksFilter": "strict",
@@ -19,7 +19,13 @@
   "platformAutomerge": true,
   "automergeStrategy": "merge-commit",
 
-  "postUpdateOptions": ["gomodTidy"],
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths",
+    "npmDedupe",
+    "pnpmDedupe",
+    "yarnDedupeHighest"
+  ],
 
   "osvVulnerabilityAlerts": true,
   "dependencyDashboardOSVVulnerabilitySummary": "all",
@@ -100,6 +106,15 @@
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "developer tooling",
       "groupSlug": "tooling",
+      "addLabels": ["tooling"]
+    },
+    {
+      "description": "This preset's own pin in a consuming repository. The quarantine is cleared because the change was reviewed and validated here before it was tagged, and a week of ageing would make every fleet-wide fix arrive a week late. WARNING: the manager only sees a preset that names a tag, so a repository extending the bare branch gets no pull request and silently tracks master instead",
+      "matchManagers": ["renovate-config"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "renovate config",
+      "groupSlug": "renovate-config",
+      "minimumReleaseAge": null,
       "addLabels": ["tooling"]
     },
     {
