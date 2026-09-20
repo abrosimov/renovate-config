@@ -41,6 +41,14 @@ means a change a consuming repository has to act on, and the distinction is
 one that matters downstream rather than in this repository: a major is what
 puts the adoption behind a dashboard tick everywhere this preset is pinned.
 
+Releases are immutable, which is the point of pinning: a tag that could be
+moved would change the policy under every repository that already resolved it,
+silently and without a pull request. The consequence is that a version cannot
+be recut, so the workflow is written to be resumable rather than repeatable —
+a rerun after a failure finishes the tag or the release that is missing
+instead of colliding with itself, and a genuinely bad release is answered by
+the next version rather than by deleting one.
+
 The path filter is deliberate. Only `default.json` reaches the consumers, so a
 change confined to the README or to a workflow releases nothing and raises no
 pull requests across the fleet. Dispatch stays available with an explicit
