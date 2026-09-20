@@ -187,6 +187,32 @@ packages together actually matters.
   request that merges itself needs no owner, and a notification for one is
   noise.
 
+Every open branch is kept on top of the base branch rather than only when it
+stops merging. `rebaseWhen: "behind-base-branch"` replaces the default `auto`,
+which resolves to `behind-base-branch` only where `automerge` is on and falls
+back to `conflicted` everywhere else. That fallback landed on exactly the
+branches that stay open longest: a pre-1.0 minor or a major waiting for a
+dashboard tick keeps `automerge: false`, so it sat at whatever `master` looked
+like on the day it was raised, and its green checks described that commit
+rather than the one it would be merged into.
+
+Rebasing is also what re-runs the update, not merely what moves the commit.
+Renovate rebuilds the branch from the current base and repeats the artefact
+step on it, so `gomodTidy` and `gomodUpdateImportPaths` run again and `go.mod`,
+`go.sum` and the vendor tree come out tidy against the base branch as it is
+now; the same holds for the npm, pnpm and Yarn dedupe options. What it does not
+do is tidy a base branch that drifted on its own — the step runs on the
+upgrade Renovate is applying, in a repository that carries a `go.mod` it
+touched, and nowhere else.
+
+Two limits are worth knowing. A branch somebody has pushed to is never
+rebased, because the rebase would discard that commit; Renovate detects the
+modification, leaves the branch alone and says so on the pull request. And a
+rebase is a new commit, so it re-runs the checks: with the self-hosted runner
+this happens once per scheduled run rather than once per push to `master`, and
+the ecosystem grouping keeps the count to a branch per ecosystem, but a busy
+base branch and a long queue of open updates do multiply into CI time.
+
 ## Security
 
 Two independent alert channels are enabled. `vulnerabilityAlerts` reads GitHub
