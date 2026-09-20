@@ -42,7 +42,7 @@ jobs:
           echo "::error::Release must run on master, got $REF"
           exit 1
 
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           # The whole history and its tags: the version is derived from what
           # has happened since the last one.
