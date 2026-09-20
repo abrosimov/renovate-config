@@ -5,6 +5,12 @@
     "security:minimumReleaseAgeCrate",
     "security:minimumReleaseAgePypi"
   ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**"
+  ],
+
   "timezone": "UTC",
   "branchPrefix": "renovate-",
   "labels": ["dependencies"],

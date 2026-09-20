@@ -86,6 +86,27 @@ One component of that base is worth knowing about because it is visible:
 dependencies, so a repository with a `package.json` sees a one-off wave of
 pinning pull requests the first time it picks this preset up.
 
+One component of it is overridden rather than inherited. `config:recommended`
+pulls in `:ignoreModulesAndTests`, which sets `ignorePaths` to skip not only
+the artefact directories but `test`, `tests`, `__tests__`, `__fixtures__` and
+`examples` as well. That is a path filter on manifest discovery, not a filter
+on dependency types, so it never touched a root `package.json`'s development
+dependencies — what it hid was a manifest that lives inside one of those
+directories: a `tests/requirements.txt`, an integration `test/go.mod`, a
+`tests/docker-compose.yml` pinning the images a test suite starts. Those files
+were not extracted at all, which means they raised no upgrades and, more to
+the point, no advisories either, so the two alert channels below had a blind
+spot exactly where a repository keeps the dependencies nobody reads.
+
+`ignorePaths` is declared non-mergeable, so naming it here replaces the
+preset's list outright rather than adding to it; a preset already in `extends`
+cannot be withdrawn any other way. What remains is the three directories that
+hold build artefacts rather than sources. `vendor` stays because Go's vendor
+tree is generated — `gomodTidy` regenerates it from the `go.mod` that Renovate
+does read. The cost is the one the preset was buying: `examples` and
+`__fixtures__` raise pull requests again, and a fixture pinned deliberately to
+an old version will be offered a newer one.
+
 Lock files are refreshed rather than left to drift. `gomodTidy` keeps `go.mod`
 honest, `gomodUpdateImportPaths` rewrites the `/vN` import paths a Go major
 demands and restores the `go mod tidy` that Renovate otherwise skips on a
