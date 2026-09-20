@@ -25,6 +25,8 @@
   "platformAutomerge": true,
   "automergeStrategy": "merge-commit",
 
+  "rebaseWhen": "behind-base-branch",
+
   "postUpdateOptions": [
     "gomodTidy",
     "gomodUpdateImportPaths",
