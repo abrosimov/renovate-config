@@ -27,7 +27,7 @@ jobs:
     name: config
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       # Renovate's engines field tracks the current Node LTS and npx resolves
       # the newest release that the installed Node satisfies, so pinning a Node
       # version here would silently pin the validator to an older Renovate and
