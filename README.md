@@ -11,12 +11,12 @@ record that Renovate is enabled while the policy itself stays central:
 ```json
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>abrosimov/renovate-config#v1.0.0"]
+  "extends": ["github>abrosimov/renovate-config#v2.0.0"]
 }
 ```
 
 `github>abrosimov/renovate-config` resolves to `default.json` in this
-repository's root, and the `#v1.0.0` suffix pins that resolution to a tag. See
+repository's root, and the `#v2.0.0` suffix pins that resolution to a tag. See
 `Versioning` below for why the suffix is not optional.
 
 ## Versioning
@@ -42,6 +42,12 @@ they automerge on a minor or a patch like anything else.
 That mechanism is also the reason the suffix is not optional: the manager
 skips a preset with no version to compare against, so an unpinned repository
 raises nothing and quietly tracks `master` instead.
+
+The tag in the example above is simply the current release; a repository is
+pinned to it once, by hand, and Renovate moves the pin from then on. A major
+release of this preset arrives in a consumer the same way any other major
+does, behind a dashboard tick, which is what a policy change that needs a
+repository setting to be flipped should look like.
 
 ## The base
 
@@ -122,9 +128,17 @@ packages together actually matters.
   minors get a branch of their own and are labelled `needs-decision`. They have
   to leave the group rather than merely lose automerge, because a branch
   automerges only when every upgrade in it does.
-- Major upgrades never merge automatically. They are held behind a Dependency
-  Dashboard tick and labelled `needs-decision`, because a major is a
-  compatibility decision rather than a refresh.
+- A major upgrade is held behind a Dependency Dashboard tick and labelled
+  `needs-decision`, because a major is a compatibility decision rather than a
+  refresh. Two classes are exempt, because for them the decision is one the
+  checks can make: the development toolchain, meaning workflow actions,
+  pre-commit, mise, asdf, nix and the Rust toolchain, and npm
+  `devDependencies`, meaning linters, formatters, test runners and type stubs.
+  Both break the pipeline inside their own branch, where a red check parks them
+  without anybody being asked. Base images are deliberately not exempt: a major
+  there is a change of operating system, which passes the checks and surfaces
+  in production instead. The fourteen-day quarantine applies to every major
+  either way.
 - Assignees are set only on the branches that ask for a decision. A pull
   request that merges itself needs no owner, and a notification for one is
   noise.

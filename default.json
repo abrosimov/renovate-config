@@ -136,13 +136,57 @@
       "addLabels": ["needs-decision"]
     },
     {
-      "description": "A major upgrade is a decision, not a refresh, so it waits to be asked for on the dashboard and is never folded into an ecosystem group. The longer quarantine is the same reasoning applied to time: a major carries the breaking change by definition, so it gets the far end of the window rather than the near one",
+      "description": "A major upgrade is a decision, not a refresh, so it waits to be asked for on the dashboard and is never folded into an ecosystem group. The longer quarantine is the same reasoning applied to time: a major carries the breaking change by definition, so it gets the far end of the window rather than the near one. The managers excluded here are decided by the checks instead, two rules below; they are excluded rather than overridden because addLabels accumulates and a branch cannot usefully carry both needs-decision and automerge",
       "matchUpdateTypes": ["major"],
+      "matchManagers": [
+        "!github-actions",
+        "!pre-commit",
+        "!mise",
+        "!asdf",
+        "!nix",
+        "!rust-toolchain",
+        "!npm"
+      ],
       "minimumReleaseAge": "14 days",
       "automerge": false,
       "dependencyDashboardApproval": true,
       "assignees": ["abrosimov"],
       "addLabels": ["needs-decision"]
+    },
+    {
+      "description": "The same decision for npm, which is held out of the rule above so that development dependencies can be told apart. WARNING: the type is negated rather than listed, because npm also extracts engines, packageManager, volta, overrides and resolutions, and a positive list of runtime types would drop those out of every major rule and leave them automerging on the inherited default",
+      "matchUpdateTypes": ["major"],
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["!devDependencies"],
+      "minimumReleaseAge": "14 days",
+      "automerge": false,
+      "dependencyDashboardApproval": true,
+      "assignees": ["abrosimov"],
+      "addLabels": ["needs-decision"]
+    },
+    {
+      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own branch, where a red check parks it without anybody being asked. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production",
+      "matchUpdateTypes": ["major"],
+      "matchManagers": [
+        "github-actions",
+        "pre-commit",
+        "mise",
+        "asdf",
+        "nix",
+        "rust-toolchain"
+      ],
+      "minimumReleaseAge": "14 days",
+      "automerge": true,
+      "addLabels": ["automerge"]
+    },
+    {
+      "description": "Linters, formatters, test runners and type stubs are not shipped, so their majors are answered by the build. A package that a repository keeps in dependencies rather than devDependencies is not covered and still asks, which is the right way round",
+      "matchUpdateTypes": ["major"],
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "minimumReleaseAge": "14 days",
+      "automerge": true,
+      "addLabels": ["automerge"]
     },
     {
       "description": "Anything that will merge itself says so on the pull request. Assignees are withheld from these on purpose: a pull request that merges itself needs no owner, and only the branches that ask for a decision are worth a notification",
