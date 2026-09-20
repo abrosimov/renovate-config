@@ -11,12 +11,58 @@ record that Renovate is enabled while the policy itself stays central:
 ```json
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>abrosimov/renovate-config"]
+  "extends": ["github>abrosimov/renovate-config#v2.0.0"]
 }
 ```
 
 `github>abrosimov/renovate-config` resolves to `default.json` in this
-repository's root.
+repository's root, and the `#v2.0.0` suffix pins that resolution to a tag. See
+`Versioning` below for why the suffix is not optional.
+
+## Versioning
+
+A repository extends a tag, never the bare branch. The bare form resolves to
+whatever `master` holds at the moment Renovate runs, which means a change here
+reaches every repository at once, unreviewed and unannounced, and a mistake
+does the same.
+
+`.github/workflows/release.yml` cuts the tags, and the merge is what triggers
+it: a push to `master` that touches `default.json` derives the next version,
+re-runs the validator against what is about to be tagged, rejects a version
+that already exists, and creates the annotated tag and a release with
+generated notes. Nothing is dispatched and nothing is decided by hand, because
+a release that waits for somebody to remember it is a change that has not
+shipped.
+
+The version comes from the commit messages since the last tag. A subject
+marked breaking, as `type!:` or with a `BREAKING CHANGE:` footer, takes the
+major; a `feat:` takes the minor; anything else is a patch. Breaking here
+means a change a consuming repository has to act on, and the distinction is
+one that matters downstream rather than in this repository: a major is what
+puts the adoption behind a dashboard tick everywhere this preset is pinned.
+
+The path filter is deliberate. Only `default.json` reaches the consumers, so a
+change confined to the README or to a workflow releases nothing and raises no
+pull requests across the fleet. Dispatch stays available with an explicit
+version, for the case where the derived one is not the one that was meant.
+
+Moving the pin afterwards is Renovate's own work rather than a chore. Its
+`renovate-config` manager reads the `extends` list, recognises a preset that
+names a tag and tracks it against this repository's tags, so a release raises
+an ordinary pull request in every consumer, running that repository's checks
+against the new policy before it applies. Those pull requests skip the
+quarantine, because the change was already reviewed and validated here, and
+they automerge on a minor or a patch like anything else.
+
+That mechanism is also the reason the suffix is not optional: the manager
+skips a preset with no version to compare against, so an unpinned repository
+raises nothing and quietly tracks `master` instead.
+
+The tag in the example above is simply the current release; a repository is
+pinned to it once, by hand, and Renovate moves the pin from then on. A major
+release of this preset arrives in a consumer the same way any other major
+does, behind a dashboard tick, which is what a policy change that needs a
+repository setting to be flipped should look like.
 
 ## The base
 
@@ -31,6 +77,14 @@ One component of that base is worth knowing about because it is visible:
 `:pinDevDependencies` changes `rangeStrategy` to `pin` for development
 dependencies, so a repository with a `package.json` sees a one-off wave of
 pinning pull requests the first time it picks this preset up.
+
+Lock files are refreshed rather than left to drift. `gomodTidy` keeps `go.mod`
+honest, `gomodUpdateImportPaths` rewrites the `/vN` import paths a Go major
+demands and restores the `go mod tidy` that Renovate otherwise skips on a
+major, and the npm, pnpm and Yarn dedupe options collapse the duplicate trees
+an upgrade leaves behind. Everything else that carries a lock file — uv, PDM,
+Poetry, Cargo, Bundler, Composer and the rest — updates it through its own
+manager with no option to set.
 
 ## The quarantine
 
@@ -76,17 +130,30 @@ packages together actually matters.
 
 - Minor, patch, digest and pin updates merge themselves once their checks pass
   and the quarantine has elapsed, and carry an `automerge` label saying so.
-  Merging goes through the platform's native auto-merge with a squash strategy,
-  which requires "Allow auto-merge" to be enabled in the repository's settings.
+  Merging goes through the platform's native auto-merge with the `merge-commit`
+  strategy: no squashing, so the merge commit keeps the message Renovate wrote
+  for the upgrade. WARNING: a consuming repository has to enable both "Allow
+  auto-merge" and "Allow merge commits" in its settings. Renovate asks the
+  platform for the strategy this preset names rather than the repository's
+  default method, so a repository with merge commits switched off has its
+  auto-merge request rejected and the pull request simply waits.
 - A repository with no checks at all has nothing to wait for, so there such an
   update merges as soon as the quarantine is over.
 - A pre-1.0 package may break on a minor and semver permits it, so pre-1.0
   minors get a branch of their own and are labelled `needs-decision`. They have
   to leave the group rather than merely lose automerge, because a branch
   automerges only when every upgrade in it does.
-- Major upgrades never merge automatically. They are held behind a Dependency
-  Dashboard tick and labelled `needs-decision`, because a major is a
-  compatibility decision rather than a refresh.
+- A major upgrade is held behind a Dependency Dashboard tick and labelled
+  `needs-decision`, because a major is a compatibility decision rather than a
+  refresh. Two classes are exempt, because for them the decision is one the
+  checks can make: the development toolchain, meaning workflow actions,
+  pre-commit, mise, asdf, nix and the Rust toolchain, and npm
+  `devDependencies`, meaning linters, formatters, test runners and type stubs.
+  Both break the pipeline inside their own branch, where a red check parks them
+  without anybody being asked. Base images are deliberately not exempt: a major
+  there is a change of operating system, which passes the checks and surfaces
+  in production instead. The fourteen-day quarantine applies to every major
+  either way.
 - Assignees are set only on the branches that ask for a decision. A pull
   request that merges itself needs no owner, and a notification for one is
   noise.
@@ -122,7 +189,13 @@ version the self-hosted runner is about to use.
 
 The repository also carries its own `renovate.json` pointing at its own preset,
 so the policy is applied to the workflow it just acquired and is exercised
-against live traffic rather than only asserted.
+against live traffic rather than only asserted. It is the one place that
+extends the branch rather than a tag, because a preset that pinned itself
+would need a release to adopt its own release.
+
+WARNING: `--strict` does not check option values. A misspelt strategy or
+update type passes validation and is then ignored at runtime, so a value read
+off the documentation is worth reading twice.
 
 ## Overriding it
 

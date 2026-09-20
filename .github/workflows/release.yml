@@ -1,0 +1,137 @@
+name: release
+
+# A tag is what the fleet extends, so a change that is not released has not
+# shipped. Cutting it by hand would put a person back in the path of every
+# policy change, so the merge itself releases: the version comes from the
+# commit messages, the validator runs again as the gate, and the tag and the
+# release follow. Dispatch is kept for the case where the derived version is
+# not the one that was meant.
+
+on:
+  push:
+    branches: [master]
+    # The consumers read default.json and nothing else, so a README or workflow
+    # change must not raise a pull request in every repository that pins us.
+    paths: ["default.json"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, as vMAJOR.MINOR.PATCH. Derived from the commits when empty"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    steps:
+      # A tag cut from a topic branch would carry configuration that never
+      # passed the push validation on master.
+      - name: Refuse to release from anywhere but master
+        if: github.ref != 'refs/heads/master'
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "::error::Release must run on master, got $REF"
+          exit 1
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          # The whole history and its tags: the version is derived from what
+          # has happened since the last one.
+          fetch-depth: 0
+
+      # A breaking change is one that a consuming repository has to act on, a
+      # feature is a policy that changes what Renovate proposes, and everything
+      # else is a patch. The distinction matters downstream rather than here:
+      # this preset's own major is what puts the adoption behind a dashboard
+      # tick in every repository that pins it.
+      - name: Determine the version
+        id: version
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          last_tag="$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)"
+          if [ -z "$last_tag" ]; then
+            base="v0.0.0"
+            range=""
+          else
+            base="$last_tag"
+            range="$last_tag..HEAD"
+          fi
+
+          if [ -n "$REQUESTED" ]; then
+            if [[ ! "$REQUESTED" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Version must look like v1.2.3, got $REQUESTED"
+              exit 1
+            fi
+            version="$REQUESTED"
+          else
+            if [ -n "$range" ] && [ -z "$(git log --oneline "$range")" ]; then
+              echo "Nothing has landed since $last_tag"
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            log="$(git log --format='%B' ${range:+"$range"})"
+            if printf '%s\n' "$log" | grep -qE '^[a-z]+(\([^)]*\))?!:|^BREAKING[ -]CHANGE:'; then
+              bump=major
+            elif printf '%s\n' "$log" | grep -qE '^feat(\([^)]*\))?:'; then
+              bump=minor
+            else
+              bump=patch
+            fi
+
+            IFS=. read -r major minor patch <<< "${base#v}"
+            case "$bump" in
+              major) major=$((major + 1)); minor=0; patch=0 ;;
+              minor) minor=$((minor + 1)); patch=0 ;;
+              patch) patch=$((patch + 1)) ;;
+            esac
+            version="v${major}.${minor}.${patch}"
+            echo "Commits since ${base} call for a ${bump}"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            echo "::error::Tag $version already exists"
+            exit 1
+          fi
+
+          echo "Releasing $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        if: steps.version.outputs.release == 'true'
+        with:
+          node-version: lts/*
+
+      # The same gate the pull requests ran, repeated against what is actually
+      # being tagged: a preset that cannot be resolved must never become a
+      # version repositories pin to, because a broken tag parks every consumer
+      # at once and cannot be moved afterwards without breaking the checkouts
+      # that already resolved it.
+      - if: steps.version.outputs.release == 'true'
+        run: npx --yes --package renovate -- renovate-config-validator --strict default.json
+
+      - name: Tag and release
+        if: steps.version.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "$VERSION"
+          git push origin "$VERSION"
+          gh release create "$VERSION" --title "$VERSION" --generate-notes --verify-tag
