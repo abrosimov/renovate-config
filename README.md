@@ -26,10 +26,25 @@ whatever `master` holds at the moment Renovate runs, which means a change here
 reaches every repository at once, unreviewed and unannounced, and a mistake
 does the same.
 
-`.github/workflows/release.yml` cuts the tags. It is dispatched by hand with a
-`vMAJOR.MINOR.PATCH` version, refuses to run anywhere but `master`, re-runs the
-validator before tagging and rejects a version that already exists, then
-creates the annotated tag and a release with generated notes.
+`.github/workflows/release.yml` cuts the tags, and the merge is what triggers
+it: a push to `master` that touches `default.json` derives the next version,
+re-runs the validator against what is about to be tagged, rejects a version
+that already exists, and creates the annotated tag and a release with
+generated notes. Nothing is dispatched and nothing is decided by hand, because
+a release that waits for somebody to remember it is a change that has not
+shipped.
+
+The version comes from the commit messages since the last tag. A subject
+marked breaking, as `type!:` or with a `BREAKING CHANGE:` footer, takes the
+major; a `feat:` takes the minor; anything else is a patch. Breaking here
+means a change a consuming repository has to act on, and the distinction is
+one that matters downstream rather than in this repository: a major is what
+puts the adoption behind a dashboard tick everywhere this preset is pinned.
+
+The path filter is deliberate. Only `default.json` reaches the consumers, so a
+change confined to the README or to a workflow releases nothing and raises no
+pull requests across the fleet. Dispatch stays available with an explicit
+version, for the case where the derived one is not the one that was meant.
 
 Moving the pin afterwards is Renovate's own work rather than a chore. Its
 `renovate-config` manager reads the `extends` list, recognises a preset that
