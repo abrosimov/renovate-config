@@ -187,14 +187,24 @@ packages together actually matters.
   request that merges itself needs no owner, and a notification for one is
   noise.
 
-Every open branch is kept on top of the base branch rather than only when it
-stops merging. `rebaseWhen: "behind-base-branch"` replaces the default `auto`,
-which resolves to `behind-base-branch` only where `automerge` is on and falls
-back to `conflicted` everywhere else. That fallback landed on exactly the
-branches that stay open longest: a pre-1.0 minor or a major waiting for a
-dashboard tick keeps `automerge: false`, so it sat at whatever `master` looked
-like on the day it was raised, and its green checks described that commit
-rather than the one it would be merged into.
+`rebaseWhen: "auto"` lets Renovate choose its rebase policy for each branch.
+Without a merge queue, automerging branches and branches whose protection
+requires them to be up to date use `behind-base-branch`. Other branches use
+`conflicted`: a pre-1.0 minor or a major awaiting a decision is not continually
+rebased unless the repository requires it.
+
+Current Renovate versions detect GitHub Merge Queue and use `conflicted` for
+its target branch, because the queue tests each proposed merge against the
+latest base and the changes ahead of it. This depends on the runner supporting
+queue detection; see Renovate's [rebase policy documentation](https://docs.renovatebot.com/configuration-options/#rebasewhen).
+The preset does not enable a queue or configure branch protection. Consumers
+using a queue must enable it in GitHub and run their required checks on
+`merge_group` events. Without a queue, required checks and the requirement to
+be up to date must be enforced in GitHub if they are to gate native auto-merge.
+
+This setting does not trigger Renovate after a merge. A scheduled runner still
+updates branches on its next run, so adopting `auto` alone does not remove the
+wait between merges in repositories without a queue.
 
 Rebasing is also what re-runs the update, not merely what moves the commit.
 Renovate rebuilds the branch from the current base and repeats the artefact
@@ -234,6 +244,11 @@ dashboard, with updates parked until somebody reads it. `.github/workflows/valid
 runs `renovate-config-validator --strict` to keep that local: it checks option
 names, manager names and regular expressions, and resolves every preset named
 in `extends`.
+
+Both validation and release also run `node --test tests/*.test.mjs`. These
+regression tests check the pre-1.0 minor rule and its complementary automerge
+label rule against versions with and without a `v` prefix, including stable
+versions that must remain outside the pre-1.0 group.
 
 It runs on pushes and pull requests, and also once a week on a schedule. The
 weekly run is the one that earns its keep. The preset is static but Renovate is

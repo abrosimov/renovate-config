@@ -25,7 +25,7 @@
   "platformAutomerge": true,
   "automergeStrategy": "merge-commit",
 
-  "rebaseWhen": "behind-base-branch",
+  "rebaseWhen": "auto",
 
   "postUpdateOptions": [
     "gomodTidy",
@@ -136,7 +136,7 @@
     {
       "description": "A pre-1.0 package may break on a minor and semver permits it, so it leaves the automerging group into one of its own. WARNING: it must leave rather than merely lose automerge, because a branch automerges only when every upgrade in it does, so a single pre-1.0 member would park the whole group",
       "matchUpdateTypes": ["minor"],
-      "matchCurrentVersion": "/^0\\./",
+      "matchCurrentVersion": "/^v?0\\./",
       "groupName": "pre-1.0 minor updates",
       "groupSlug": "pre-1-0-minor",
       "automerge": false,
@@ -204,7 +204,7 @@
     {
       "description": "Minor is qualified because the pre-1.0 rule above withholds automerge from it",
       "matchUpdateTypes": ["minor"],
-      "matchCurrentVersion": "!/^0\\./",
+      "matchCurrentVersion": "!/^v?0\\./",
       "addLabels": ["automerge"]
     }
   ]
