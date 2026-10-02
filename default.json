@@ -22,8 +22,11 @@
   "minimumReleaseAgeBehaviour": "timestamp-required",
 
   "automerge": true,
+  "automergeType": "branch",
   "platformAutomerge": true,
   "automergeStrategy": "merge-commit",
+  "assignees": ["abrosimov"],
+  "assignAutomerge": false,
 
   "rebaseWhen": "auto",
 
@@ -126,25 +129,77 @@
       "addLabels": ["tooling"]
     },
     {
+      "description": "A language runtime is pinned in several files at once — the go directive and the golang image, a setup action's input, a version file, a toolchain manager — and each would otherwise raise a branch of its own. Grouping it by name across managers moves every pin in one commit, so a build never mixes two versions of the same runtime. Majors still split off into a branch of their own, because separateMajorMinor applies inside a group",
+      "matchDepNames": ["go", "golang"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "groupName": "go runtime",
+      "groupSlug": "go-runtime"
+    },
+    {
+      "matchDepNames": ["node"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "groupName": "node runtime",
+      "groupSlug": "node-runtime"
+    },
+    {
+      "matchDepNames": ["python"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "groupName": "python runtime",
+      "groupSlug": "python-runtime"
+    },
+    {
       "description": "Digest and pin moves keep the tag, so they are a rebuilt layer rather than an upgrade decision and belong in one branch of their own. The ageing requirement is cleared here deliberately: a digest carries no release timestamp to age against, and minimumReleaseAgeBehaviour: timestamp-required would otherwise hold every one of them indefinitely",
       "matchUpdateTypes": ["digest", "pin", "pinDigest"],
       "groupName": "digests and pins",
       "groupSlug": "digests",
-      "minimumReleaseAge": null,
-      "addLabels": ["automerge"]
+      "minimumReleaseAge": null
     },
     {
-      "description": "A pre-1.0 package may break on a minor and semver permits it, so it leaves the automerging group into one of its own. WARNING: it must leave rather than merely lose automerge, because a branch automerges only when every upgrade in it does, so a single pre-1.0 member would park the whole group",
-      "matchUpdateTypes": ["minor"],
-      "matchCurrentVersion": "/^v?0\\./",
-      "groupName": "pre-1.0 minor updates",
-      "groupSlug": "pre-1-0-minor",
+      "description": "A digest move under a tag that names no version — latest, alpine, stable — is not a rebuilt layer but whatever upstream released since, majors and schema migrations included, and it arrives with no quarantine because digests are exempt from one. It is therefore a decision. The durable answer is a versioned tag in the consuming repository, which turns the same move into an ordinary update with a type and an age. It leaves the digest group for the reason the pre-1.0 rule gives",
+      "matchUpdateTypes": ["digest"],
+      "matchDatasources": ["docker"],
+      "matchCurrentValue": "!/\\d/",
+      "groupName": "unversioned image tags",
+      "groupSlug": "unversioned-tags",
       "automerge": false,
-      "assignees": ["abrosimov"],
       "addLabels": ["needs-decision"]
     },
     {
-      "description": "A major upgrade is a decision, not a refresh, so it waits to be asked for on the dashboard and is never folded into an ecosystem group. The longer quarantine is the same reasoning applied to time: a major carries the breaking change by definition, so it gets the far end of the window rather than the near one. The managers excluded here are decided by the checks instead, two rules below; they are excluded rather than overridden because addLabels accumulates and a branch cannot usefully carry both needs-decision and automerge",
+      "description": "A pre-1.0 package may break on a minor and semver permits it, so it leaves the automerging group into one of its own. WARNING: it must leave rather than merely lose automerge, because a branch automerges only when every upgrade in it does, so a single pre-1.0 member would park the whole group. The excluded packages are permanently 0.x by convention and versioned with the stability of a 1.x: the Go extended library, the generated Google API stubs and the OpenTelemetry contrib modules that move in lockstep with their 1.x core. Without the exclusion every one of them, security fixes included, waits for a decision",
+      "matchUpdateTypes": ["minor"],
+      "matchCurrentVersion": "/^v?0\\./",
+      "matchPackageNames": [
+        "!golang.org/x/**",
+        "!google.golang.org/genproto/**",
+        "!go.opentelemetry.io/contrib/**",
+        "!opentelemetry-instrumentation*",
+        "!opentelemetry-semantic-conventions",
+        "!opentelemetry-util-http"
+      ],
+      "groupName": "pre-1.0 minor updates",
+      "groupSlug": "pre-1-0-minor",
+      "automerge": false,
+      "addLabels": ["needs-decision"]
+    },
+    {
+      "description": "Below 0.1 semver gives no compatibility promise at all, so even a patch may break, and packages that live there for years ship their breaking changes exactly that way. It joins the pre-1.0 branch rather than starting another",
+      "matchUpdateTypes": ["patch"],
+      "matchCurrentVersion": "/^v?0\\.0\\./",
+      "matchPackageNames": [
+        "!golang.org/x/**",
+        "!google.golang.org/genproto/**",
+        "!go.opentelemetry.io/contrib/**",
+        "!opentelemetry-instrumentation*",
+        "!opentelemetry-semantic-conventions",
+        "!opentelemetry-util-http"
+      ],
+      "groupName": "pre-1.0 minor updates",
+      "groupSlug": "pre-1-0-minor",
+      "automerge": false,
+      "addLabels": ["needs-decision"]
+    },
+    {
+      "description": "A major upgrade is a decision, not a refresh, so it opens a pull request straight away, assigned and with the checks already run, and waits there for the merge button; it is never folded into an ecosystem group. The longer quarantine is the same reasoning applied to time: a major carries the breaking change by definition, so it gets the far end of the window rather than the near one. The managers excluded here are decided by the rules below instead; they are excluded rather than overridden because addLabels accumulates and a branch cannot usefully carry both needs-decision and automerge",
       "matchUpdateTypes": ["major"],
       "matchManagers": [
         "!github-actions",
@@ -153,27 +208,29 @@
         "!asdf",
         "!nix",
         "!rust-toolchain",
-        "!npm"
+        "!npm",
+        "!pep621"
       ],
       "minimumReleaseAge": "14 days",
       "automerge": false,
-      "dependencyDashboardApproval": true,
-      "assignees": ["abrosimov"],
       "addLabels": ["needs-decision"]
     },
     {
-      "description": "The same decision for npm, which is held out of the rule above so that development dependencies can be told apart. WARNING: the type is negated rather than listed, because npm also extracts engines, packageManager, volta, overrides and resolutions, and a positive list of runtime types would drop those out of every major rule and leave them automerging on the inherited default",
+      "description": "The same decision for npm and pyproject, which are held out of the rule above so that development dependencies can be told apart. WARNING: the type is negated rather than listed, because npm also extracts engines, packageManager, volta, overrides and resolutions, and pyproject extracts requires-python and build-system.requires; a positive list of runtime types would drop those out of every major rule and leave them automerging on the inherited default",
       "matchUpdateTypes": ["major"],
-      "matchManagers": ["npm"],
-      "matchDepTypes": ["!devDependencies"],
+      "matchManagers": ["npm", "pep621"],
+      "matchDepTypes": [
+        "!devDependencies",
+        "!dependency-groups",
+        "!tool.uv.dev-dependencies",
+        "!tool.pdm.dev-dependencies"
+      ],
       "minimumReleaseAge": "14 days",
       "automerge": false,
-      "dependencyDashboardApproval": true,
-      "assignees": ["abrosimov"],
       "addLabels": ["needs-decision"]
     },
     {
-      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own branch, where a red check parks it without anybody being asked. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production",
+      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own branch, where a red check turns it into an assigned pull request without anybody being asked in advance. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production. Language runtimes are not here either, although these managers extract them, because the runtime a setup action or a toolchain file installs is the one the product is built and tested on",
       "matchUpdateTypes": ["major"],
       "matchManagers": [
         "github-actions",
@@ -183,28 +240,105 @@
         "nix",
         "rust-toolchain"
       ],
+      "matchDepNames": ["!go", "!golang", "!node", "!python"],
       "minimumReleaseAge": "14 days",
       "automerge": true,
       "addLabels": ["automerge"]
     },
     {
-      "description": "Linters, formatters, test runners and type stubs are not shipped, so their majors are answered by the build. A package that a repository keeps in dependencies rather than devDependencies is not covered and still asks, which is the right way round",
+      "description": "Linters, formatters, test runners and type stubs are not shipped, so their majors are answered by the build. A package that a repository keeps among its runtime dependencies rather than its development ones is not covered and still asks, which is the right way round",
       "matchUpdateTypes": ["major"],
-      "matchManagers": ["npm"],
-      "matchDepTypes": ["devDependencies"],
+      "matchManagers": ["npm", "pep621"],
+      "matchDepTypes": [
+        "devDependencies",
+        "dependency-groups",
+        "tool.uv.dev-dependencies",
+        "tool.pdm.dev-dependencies"
+      ],
       "minimumReleaseAge": "14 days",
       "automerge": true,
       "addLabels": ["automerge"]
     },
     {
-      "description": "Anything that will merge itself says so on the pull request. Assignees are withheld from these on purpose: a pull request that merges itself needs no owner, and only the branches that ask for a decision are worth a notification",
+      "description": "The runtime majors the toolchain rule leaves out, decided like any other major",
+      "matchUpdateTypes": ["major"],
+      "matchManagers": [
+        "github-actions",
+        "pre-commit",
+        "mise",
+        "asdf",
+        "nix",
+        "rust-toolchain"
+      ],
+      "matchDepNames": ["go", "golang", "node", "python"],
+      "minimumReleaseAge": "14 days",
+      "automerge": false,
+      "addLabels": ["needs-decision"]
+    },
+    {
+      "description": "Python versions its language on the minor: 3.13 to 3.14 removes deprecated modules, changes the ABI that compiled wheels target and is where packages drop support, so it is a major in everything but name. It leaves the runtime group for the reason the pre-1.0 rule gives",
+      "matchDepNames": ["python"],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "python runtime minor",
+      "groupSlug": "python-runtime-minor",
+      "minimumReleaseAge": "14 days",
+      "automerge": false,
+      "addLabels": ["needs-decision"]
+    },
+    {
+      "description": "Anything that will merge itself says so on the branch and on the pull request a failure raises. Assignees are withheld from these by assignAutomerge: a branch that merges itself needs no owner, and Renovate assigns one only when the checks go red, which is exactly when an owner is needed",
       "matchUpdateTypes": ["patch"],
+      "matchCurrentVersion": "!/^v?0\\.0\\./",
       "addLabels": ["automerge"]
     },
     {
-      "description": "Minor is qualified because the pre-1.0 rule above withholds automerge from it",
+      "description": "Minor is qualified because the pre-1.0 and python runtime rules above withhold automerge from it",
       "matchUpdateTypes": ["minor"],
       "matchCurrentVersion": "!/^v?0\\./",
+      "matchDepNames": ["!python"],
+      "addLabels": ["automerge"]
+    },
+    {
+      "description": "The permanently 0.x packages the pre-1.0 rules exclude automerge, so they carry the label the two rules above withhold from 0.x",
+      "matchUpdateTypes": ["minor"],
+      "matchCurrentVersion": "/^v?0\\./",
+      "matchPackageNames": [
+        "golang.org/x/**",
+        "google.golang.org/genproto/**",
+        "go.opentelemetry.io/contrib/**",
+        "opentelemetry-instrumentation*",
+        "opentelemetry-semantic-conventions",
+        "opentelemetry-util-http"
+      ],
+      "addLabels": ["automerge"]
+    },
+    {
+      "matchUpdateTypes": ["patch"],
+      "matchCurrentVersion": "/^v?0\\.0\\./",
+      "matchPackageNames": [
+        "golang.org/x/**",
+        "google.golang.org/genproto/**",
+        "go.opentelemetry.io/contrib/**",
+        "opentelemetry-instrumentation*",
+        "opentelemetry-semantic-conventions",
+        "opentelemetry-util-http"
+      ],
+      "addLabels": ["automerge"]
+    },
+    {
+      "matchUpdateTypes": ["pin", "pinDigest", "lockFileMaintenance"],
+      "addLabels": ["automerge"]
+    },
+    {
+      "description": "Digest is qualified because the unversioned tag rule above withholds automerge from a docker digest whose tag names no version",
+      "matchUpdateTypes": ["digest"],
+      "matchDatasources": ["!docker"],
+      "addLabels": ["automerge"]
+    },
+    {
+      "matchUpdateTypes": ["digest"],
+      "matchDatasources": ["docker"],
+      "matchCurrentValue": "/\\d/",
       "addLabels": ["automerge"]
     }
   ]
