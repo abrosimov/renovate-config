@@ -39,7 +39,8 @@ marked breaking, as `type!:` or with a `BREAKING CHANGE:` footer, takes the
 major; a `feat:` takes the minor; anything else is a patch. Breaking here
 means a change a consuming repository has to act on, and the distinction is
 one that matters downstream rather than in this repository: a major is what
-puts the adoption behind a dashboard tick everywhere this preset is pinned.
+turns the adoption into a decision, an assigned pull request, everywhere this
+preset is pinned.
 
 Releases are immutable, which is the point of pinning: a tag that could be
 moved would change the policy under every repository that already resolved it,
@@ -69,8 +70,9 @@ raises nothing and quietly tracks `master` instead.
 The tag in the example above is simply the current release; a repository is
 pinned to it once, by hand, and Renovate moves the pin from then on. A major
 release of this preset arrives in a consumer the same way any other major
-does, behind a dashboard tick, which is what a policy change that needs a
-repository setting to be flipped should look like.
+does, as an assigned pull request waiting for its merge button, which is what
+a policy change that needs a repository setting to be flipped should look
+like.
 
 ## The base
 
@@ -155,37 +157,84 @@ Grouping by ecosystem also leaves the curated monorepo groupings from the base
 configuration to decide `major`, which is the case where moving a monorepo's
 packages together actually matters.
 
+Language runtimes cut across the ecosystems and are grouped by name instead:
+`go` and `golang`, `node`, `python`. A repository pins its runtime in several
+places at once — the `go` directive and the `golang` image, a setup action's
+input, `engines`, a version file, a toolchain manager — and grouping by name
+moves all of them in one commit, so a build never mixes two versions of the
+same runtime. A runtime major still gets a branch of its own, separate from
+the runtime's minors and patches.
+
 ## Merging and triage
 
-- Minor, patch, digest and pin updates merge themselves once their checks pass
-  and the quarantine has elapsed, and carry an `automerge` label saying so.
-  Merging goes through the platform's native auto-merge with the `merge-commit`
-  strategy: no squashing, so the merge commit keeps the message Renovate wrote
-  for the upgrade. WARNING: a consuming repository has to enable both "Allow
-  auto-merge" and "Allow merge commits" in its settings. Renovate asks the
-  platform for the strategy this preset names rather than the repository's
-  default method, so a repository with merge commits switched off has its
-  auto-merge request rejected and the pull request simply waits.
-- A repository with no checks at all has nothing to wait for, so there such an
-  update merges as soon as the quarantine is over.
-- A pre-1.0 package may break on a minor and semver permits it, so pre-1.0
-  minors get a branch of their own and are labelled `needs-decision`. They have
-  to leave the group rather than merely lose automerge, because a branch
-  automerges only when every upgrade in it does.
-- A major upgrade is held behind a Dependency Dashboard tick and labelled
-  `needs-decision`, because a major is a compatibility decision rather than a
-  refresh. Two classes are exempt, because for them the decision is one the
-  checks can make: the development toolchain, meaning workflow actions,
-  pre-commit, mise, asdf, nix and the Rust toolchain, and npm
-  `devDependencies`, meaning linters, formatters, test runners and type stubs.
-  Both break the pipeline inside their own branch, where a red check parks them
-  without anybody being asked. Base images are deliberately not exempt: a major
-  there is a change of operating system, which passes the checks and surfaces
-  in production instead. The fourteen-day quarantine applies to every major
-  either way.
-- Assignees are set only on the branches that ask for a decision. A pull
-  request that merges itself needs no owner, and a notification for one is
-  noise.
+The policy sorts every update into one of three outcomes, and only the last
+two put anything in front of a person.
+
+1. **Routine: nothing to see.** Minor, patch, digest and pin updates, lock
+   file maintenance, and the majors listed below as decided by the checks. The
+   branch is pushed, the repository's checks run on it, and once they are
+   green and the quarantine has elapsed Renovate merges the branch into the
+   base itself (`automergeType: "branch"`). No pull request is opened. The
+   branch, and any pull request it later needs, carries an `automerge` label.
+2. **Routine that failed: an assigned pull request.** When a check goes red,
+   Renovate opens a pull request for the branch and assigns it
+   (`assignees` with `assignAutomerge: false`, which withholds assignees only
+   while the checks are passing or pending). This is the one notification a
+   routine update produces, and it means something broke.
+3. **Decision: an assigned pull request, straight away.** A major, a pre-1.0
+   update, a Python minor and a digest under an unversioned tag open a pull
+   request at once, assigned and labelled `needs-decision`, with the checks
+   already running. The decision is the merge button; there is no Dependency
+   Dashboard tick to give first.
+
+What counts as a decision:
+
+- A major upgrade, because it is a compatibility decision rather than a
+  refresh. Three classes are exempt, because for them the decision is one the
+  checks can make: the development toolchain (workflow actions, pre-commit,
+  mise, asdf, nix and the Rust toolchain), npm `devDependencies`, and Python
+  development groups (`[dependency-groups]`, uv's and PDM's dev dependencies).
+  All of them break the pipeline inside their own branch. Base images are
+  deliberately not exempt: a major there is a change of operating system,
+  which passes the checks and surfaces in production instead. Nor are language
+  runtimes, even where a toolchain manager or a setup action is what pins them.
+  The fourteen-day quarantine applies to every major either way.
+- A pre-1.0 minor, and a patch below 0.1, because semver gives them no
+  compatibility promise. They get a branch of their own; they have to leave
+  their ecosystem group rather than merely lose automerge, because a branch
+  automerges only when every upgrade in it does. Packages that are permanently
+  0.x and versioned like a 1.x are exempt: `golang.org/x`, the generated
+  `google.golang.org/genproto` stubs, and the OpenTelemetry contrib and
+  instrumentation packages that move in lockstep with their 1.x core.
+- A Python minor, because Python versions its language on the minor: modules
+  are removed, the ABI compiled wheels target changes, and packages drop
+  support there.
+- A digest under a tag that names no version — `latest`, `alpine`, `stable` —
+  because the move is whatever upstream released since, majors and schema
+  migrations included, and digests carry no release date to quarantine
+  against. The durable answer is a versioned tag in the repository.
+
+What a consuming repository has to provide:
+
+- **Checks that run on the branch.** Branch automerge reads the status of the
+  branch's commit, so the repository's CI has to run on a push to Renovate's
+  branches (`renovate-**`), not only on pull requests. A repository whose CI
+  runs only on `pull_request` still works, more slowly: the branch shows no
+  checks, which Renovate treats as pending rather than green (its own
+  `renovate/` statuses do not count), so after `prNotPendingHours` it opens a
+  pull request, the checks run there, and the update merges once they pass.
+  A repository with no checks at all never goes green on its own branches, so
+  its routine updates end up as pull requests too.
+- **A base branch Renovate may push to.** A branch protection rule that
+  requires pull requests rejects the merge; Renovate then falls back to
+  opening a pull request with the platform's native auto-merge enabled, which
+  merges once the required checks pass. That works, but it is the pull request
+  the policy was meant to avoid, so either let the Renovate App bypass the
+  rule or accept the pull requests. For that fallback, and for every pull
+  request a failure raises, "Allow auto-merge" and "Allow merge commits" must
+  be enabled: Renovate asks the platform for the `merge-commit` strategy this
+  preset names, and a repository with merge commits switched off rejects the
+  request and the pull request simply waits.
 
 `rebaseWhen: "auto"` lets Renovate choose its rebase policy for each branch.
 Without a merge queue, automerging branches and branches whose protection
@@ -245,10 +294,17 @@ runs `renovate-config-validator --strict` to keep that local: it checks option
 names, manager names and regular expressions, and resolves every preset named
 in `extends`.
 
-Both validation and release also run `node --test tests/*.test.mjs`. These
-regression tests check the pre-1.0 minor rule and its complementary automerge
-label rule against versions with and without a `v` prefix, including stable
-versions that must remain outside the pre-1.0 group.
+Both validation and release also run `node --test tests/*.test.mjs` against
+an installed Renovate package. The tests feed representative updates — a Go
+module minor, a pre-1.0 npm minor, a Python runtime minor in a base image, a
+Node major in a setup action, a digest under `latest` and so on — through
+Renovate's own `applyPackageRules`, and check which of the three outcomes each
+one gets, its group, and that its labels agree with its behaviour. The real
+matcher is used rather than a copy because negated globs, fields an update
+does not have, and label accumulation are exactly where an approximation and
+the engine disagree. The import reaches into Renovate's internals, so a
+restructuring upstream fails the weekly run loudly rather than passing
+silently.
 
 It runs on pushes and pull requests, and also once a week on a schedule. The
 weekly run is the one that earns its keep. The preset is static but Renovate is

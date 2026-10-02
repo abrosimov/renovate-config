@@ -35,8 +35,13 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: lts/*
-      - name: Test minor version rules
-        run: node --test tests/*.test.mjs
+      # The tests import Renovate's own package-rule matcher, so they judge the
+      # policy by the engine that will apply it, unpinned for the same reason
+      # as the validator below.
+      - name: Test the policy against Renovate's rule engine
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/renovate" renovate
+          RENOVATE_DIR="$RUNNER_TEMP/renovate/node_modules/renovate" node --test tests/*.test.mjs
       # --strict fails on anything the validator would otherwise only warn
       # about, deprecated options among it. WARNING: a file passed by path is
       # validated as a global configuration, which is a superset of the

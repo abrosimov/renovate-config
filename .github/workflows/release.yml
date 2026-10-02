@@ -128,9 +128,11 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Test minor version rules
+      - name: Test the policy against Renovate's rule engine
         if: steps.version.outputs.release == 'true'
-        run: node --test tests/*.test.mjs
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/renovate" renovate
+          RENOVATE_DIR="$RUNNER_TEMP/renovate/node_modules/renovate" node --test tests/*.test.mjs
 
       # The same gate the pull requests ran, repeated against what is actually
       # being tagged: a preset that cannot be resolved must never become a
