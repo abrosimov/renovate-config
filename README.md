@@ -171,16 +171,18 @@ The policy sorts every update into one of three outcomes, and only the last
 two put anything in front of a person.
 
 1. **Routine: nothing to see.** Minor, patch, digest and pin updates, lock
-   file maintenance, and the majors listed below as decided by the checks. The
-   branch is pushed, the repository's checks run on it, and once they are
-   green and the quarantine has elapsed Renovate merges the branch into the
-   base itself (`automergeType: "branch"`). No pull request is opened. The
-   branch, and any pull request it later needs, carries an `automerge` label.
+   file maintenance, and the majors listed below as decided by the checks.
+   Once the quarantine has elapsed Renovate opens a pull request, labelled
+   `automerge` and unassigned, with the platform's native auto-merge enabled
+   (`automergeType: "pr"`, `platformAutomerge: true`). The repository's checks
+   and branch protection run on it as on any other pull request, and GitHub
+   merges it once they pass. Nothing reaches the base branch without a pull
+   request.
 2. **Routine that failed: an assigned pull request.** When a check goes red,
-   Renovate opens a pull request for the branch and assigns it
-   (`assignees` with `assignAutomerge: false`, which withholds assignees only
-   while the checks are passing or pending). This is the one notification a
-   routine update produces, and it means something broke.
+   the pull request stays open and Renovate assigns it (`assignees` with
+   `assignAutomerge: false`, which withholds assignees only while the checks
+   are passing or pending). This is the one notification a routine update
+   produces, and it means something broke.
 3. **Decision: an assigned pull request, straight away.** A major, a pre-1.0
    update, a Python minor and a digest under an unversioned tag open a pull
    request at once, assigned and labelled `needs-decision`, with the checks
@@ -194,7 +196,7 @@ What counts as a decision:
   checks can make: the development toolchain (workflow actions, pre-commit,
   mise, asdf, nix and the Rust toolchain), npm `devDependencies`, and Python
   development groups (`[dependency-groups]`, uv's and PDM's dev dependencies).
-  All of them break the pipeline inside their own branch. Base images are
+  All of them break the pipeline inside their own pull request. Base images are
   deliberately not exempt: a major there is a change of operating system,
   which passes the checks and surfaces in production instead. Nor are language
   runtimes, even where a toolchain manager or a setup action is what pins them.
@@ -216,25 +218,25 @@ What counts as a decision:
 
 What a consuming repository has to provide:
 
-- **Checks that run on the branch.** Branch automerge reads the status of the
-  branch's commit, so the repository's CI has to run on a push to Renovate's
-  branches (`renovate-**`), not only on pull requests. A repository whose CI
-  runs only on `pull_request` still works, more slowly: the branch shows no
-  checks, which Renovate treats as pending rather than green (its own
-  `renovate/` statuses do not count), so after `prNotPendingHours` it opens a
-  pull request, the checks run there, and the update merges once they pass.
-  A repository with no checks at all never goes green on its own branches, so
-  its routine updates end up as pull requests too.
-- **A base branch Renovate may push to.** A branch protection rule that
-  requires pull requests rejects the merge; Renovate then falls back to
-  opening a pull request with the platform's native auto-merge enabled, which
-  merges once the required checks pass. That works, but it is the pull request
-  the policy was meant to avoid, so either let the Renovate App bypass the
-  rule or accept the pull requests. For that fallback, and for every pull
-  request a failure raises, "Allow auto-merge" and "Allow merge commits" must
-  be enabled: Renovate asks the platform for the `merge-commit` strategy this
-  preset names, and a repository with merge commits switched off rejects the
-  request and the pull request simply waits.
+- **Required checks on the base branch.** Native auto-merge waits for the
+  checks that branch protection requires, not for every check that happens to
+  run, so the checks that should gate an update have to be marked required,
+  and they have to run on every pull request: a check behind a `paths` filter
+  never reports on a pull request that misses those paths, and a required
+  check that never reports blocks the merge for good. The name must match
+  exactly, and a matrix job reports one check per leg, `lint (ubuntu-latest)`
+  rather than `lint`. The Renovate App needs no bypass of the protection rule:
+  it never pushes to the base branch.
+- **A repository with no checks waits for a person.** Renovate reads a commit
+  with no checks as pending rather than green (its own `renovate/` statuses do
+  not count), so it never merges such a pull request itself. That holds for a
+  repository without CI and for one whose CI does not run on every pull
+  request; its routine updates still arrive as pull requests, and the merge
+  button is the review.
+- **Auto-merge and merge commits allowed.** "Allow auto-merge" and "Allow
+  merge commits" must be enabled: Renovate asks the platform for the
+  `merge-commit` strategy this preset names, and a repository with either
+  switched off rejects the request and the pull request simply waits.
 
 `rebaseWhen: "auto"` lets Renovate choose its rebase policy for each branch.
 Without a merge queue, automerging branches and branches whose protection

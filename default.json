@@ -22,7 +22,7 @@
   "minimumReleaseAgeBehaviour": "timestamp-required",
 
   "automerge": true,
-  "automergeType": "branch",
+  "automergeType": "pr",
   "platformAutomerge": true,
   "automergeStrategy": "merge-commit",
   "assignees": ["abrosimov"],
@@ -230,7 +230,7 @@
       "addLabels": ["needs-decision"]
     },
     {
-      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own branch, where a red check turns it into an assigned pull request without anybody being asked in advance. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production. Language runtimes are not here either, although these managers extract them, because the runtime a setup action or a toolchain file installs is the one the product is built and tested on",
+      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own pull request, where a red check holds the merge and assigns it without anybody being asked in advance. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production. Language runtimes are not here either, although these managers extract them, because the runtime a setup action or a toolchain file installs is the one the product is built and tested on",
       "matchUpdateTypes": ["major"],
       "matchManagers": [
         "github-actions",
@@ -286,7 +286,7 @@
       "addLabels": ["needs-decision"]
     },
     {
-      "description": "Anything that will merge itself says so on the branch and on the pull request a failure raises. Assignees are withheld from these by assignAutomerge: a branch that merges itself needs no owner, and Renovate assigns one only when the checks go red, which is exactly when an owner is needed",
+      "description": "Anything that will merge itself says so on its pull request. Assignees are withheld from these by assignAutomerge: a pull request that merges itself needs no owner, and Renovate assigns one only when the checks go red, which is exactly when an owner is needed",
       "matchUpdateTypes": ["patch"],
       "matchCurrentVersion": "!/^v?0\\.0\\./",
       "addLabels": ["automerge"]

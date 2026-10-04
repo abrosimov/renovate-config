@@ -153,11 +153,12 @@ for (const [version, preOne] of [
   }
 }
 
-test('routine updates merge from a branch, and only a failing one is assigned', () => {
+test('routine updates merge through a pull request, and only a failing one is assigned', () => {
   assert.equal(preset.automerge, true);
-  assert.equal(preset.automergeType, 'branch');
+  assert.equal(preset.automergeType, 'pr');
+  assert.equal(preset.platformAutomerge, true);
   assert.equal(preset.assignAutomerge, false);
-  assert.ok(preset.assignees?.length, 'a failing branch needs somebody to assign');
+  assert.ok(preset.assignees?.length, 'a failing pull request needs somebody to assign');
 });
 
 test('a decision opens a pull request rather than waiting for a dashboard tick', () => {
