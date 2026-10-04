@@ -68,6 +68,16 @@ const docker = (manager, depName, currentValue, currentVersion, updateType) => (
   updateType,
 });
 
+const presetPin = (depName, currentValue, updateType) => ({
+  manager: 'renovate-config',
+  datasource: 'github-tags',
+  depName,
+  packageName: depName,
+  currentValue,
+  currentVersion: currentValue,
+  updateType,
+});
+
 const SILENT = { automerge: true, decision: false, automergeLabel: true };
 const DECISION = { automerge: false, decision: true, automergeLabel: false };
 
@@ -107,6 +117,10 @@ const cases = [
   ['digest under a variant-only tag', docker('dockerfile', 'nginx', 'alpine', undefined, 'digest'), { ...DECISION, groupSlug: 'unversioned-tags', minimumReleaseAge: null }],
   ['workflow action digest', { manager: 'github-actions', datasource: 'github-tags', depType: 'action', depName: 'actions/checkout', packageName: 'actions/checkout', currentValue: 'v6', currentVersion: 'v6', updateType: 'digest' }, { ...SILENT, groupSlug: 'digests' }],
   ['first digest pin of an unversioned tag', docker('docker-compose', 'temporalio/auto-setup', 'latest', undefined, 'pinDigest'), { ...SILENT, groupSlug: 'digests' }],
+  ['this preset\'s own minor', presetPin('abrosimov/renovate-config', 'v3.0.0', 'minor'), { ...SILENT, groupSlug: 'renovate-config', minimumReleaseAge: null }],
+  ['this preset\'s own major', presetPin('abrosimov/renovate-config', 'v1.0.0', 'major'), { ...DECISION, minimumReleaseAge: null }],
+  ['third-party preset minor', presetPin('example/renovate-config', 'v3.0.0', 'minor'), { ...SILENT, minimumReleaseAge: '7 days' }],
+  ['third-party preset major', presetPin('example/renovate-config', 'v1.0.0', 'major'), { ...DECISION, minimumReleaseAge: '14 days' }],
   ['lock file maintenance', { manager: 'pep621', updateType: 'lockFileMaintenance' }, SILENT],
 ];
 

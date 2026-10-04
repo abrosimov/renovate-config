@@ -61,7 +61,15 @@ names a tag and tracks it against this repository's tags, so a release raises
 an ordinary pull request in every consumer, running that repository's checks
 against the new policy before it applies. Those pull requests skip the
 quarantine, because the change was already reviewed and validated here, and
-they automerge on a minor or a patch like anything else.
+they automerge on a minor or a patch like anything else. A major skips it too
+but still waits for its merge button, as described below. The exemption names
+this repository: the manager tracks any preset pinned to a tag, and a third
+party's was reviewed nowhere here, so it ages like any other dependency.
+
+A pull request is judged by the policy its repository extends at the time,
+not by the one it proposes. A repository pinned to a release older than an
+exemption therefore still holds the update that would bring it, and the first
+such move is merged by hand.
 
 That mechanism is also the reason the suffix is not optional: the manager
 skips a preset with no version to compare against, so an unpinned repository
@@ -144,6 +152,9 @@ they are not upgrades in the first place.
 Security fixes are exempt too, by Renovate's own design: a vulnerability fix
 skips the quarantine, the schedule and every rate limit.
 
+So does a move of this preset's own pin, majors included, because the release
+was reviewed and validated here before it was tagged; see `Versioning`.
+
 ## The grouping
 
 Non-major updates are grouped by ecosystem, one branch each: Go modules,
@@ -200,7 +211,8 @@ What counts as a decision:
   deliberately not exempt: a major there is a change of operating system,
   which passes the checks and surfaces in production instead. Nor are language
   runtimes, even where a toolchain manager or a setup action is what pins them.
-  The fourteen-day quarantine applies to every major either way.
+  The fourteen-day quarantine applies to every major either way, except a
+  major of this preset, which was reviewed here before it was tagged.
 - A pre-1.0 minor, and a patch below 0.1, because semver gives them no
   compatibility promise. They get a branch of their own; they have to leave
   their ecosystem group rather than merely lose automerge, because a branch
