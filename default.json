@@ -120,8 +120,9 @@
       "addLabels": ["tooling"]
     },
     {
-      "description": "This preset's own pin in a consuming repository. The quarantine is cleared because the change was reviewed and validated here before it was tagged, and a week of ageing would make every fleet-wide fix arrive a week late. WARNING: the manager only sees a preset that names a tag, so a repository extending the bare branch gets no pull request and silently tracks master instead",
+      "description": "This preset's own pin in a consuming repository. The quarantine is cleared because the change was reviewed and validated here before it was tagged, and a week of ageing would make every fleet-wide fix arrive a week late. The package is named because the manager tracks any preset that names a tag, a third party's included, and that one was reviewed nowhere here, so it keeps the quarantine like any other dependency. WARNING: the manager only sees a preset that names a tag, so a repository extending the bare branch gets no pull request and silently tracks master instead",
       "matchManagers": ["renovate-config"],
+      "matchPackageNames": ["abrosimov/renovate-config"],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "renovate config",
       "groupSlug": "renovate-config",
@@ -284,6 +285,13 @@
       "minimumReleaseAge": "14 days",
       "automerge": false,
       "addLabels": ["needs-decision"]
+    },
+    {
+      "description": "A major of this preset is still a decision, because it is what a consuming repository has to act on, but it is not a third party's breaking change, so it skips the quarantine for the reason the rule for its minors gives. Only the age is cleared: the major rules above still withhold automerge and label it. WARNING: it must stay below every rule that sets the fourteen days, because the last matching rule decides minimumReleaseAge",
+      "matchManagers": ["renovate-config"],
+      "matchPackageNames": ["abrosimov/renovate-config"],
+      "matchUpdateTypes": ["major"],
+      "minimumReleaseAge": null
     },
     {
       "description": "Anything that will merge itself says so on its pull request. Assignees are withheld from these by assignAutomerge: a pull request that merges itself needs no owner, and Renovate assigns one only when the checks go red, which is exactly when an owner is needed",
