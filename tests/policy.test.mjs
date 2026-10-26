@@ -121,7 +121,7 @@ const cases = [
   ['this preset\'s own major', presetPin('abrosimov/renovate-config', 'v1.0.0', 'major'), { ...DECISION, minimumReleaseAge: null }],
   ['third-party preset minor', presetPin('example/renovate-config', 'v3.0.0', 'minor'), { ...SILENT, minimumReleaseAge: '7 days' }],
   ['third-party preset major', presetPin('example/renovate-config', 'v1.0.0', 'major'), { ...DECISION, minimumReleaseAge: '14 days' }],
-  ['lock file maintenance', { manager: 'pep621', updateType: 'lockFileMaintenance' }, SILENT],
+  ['lock file maintenance', { manager: 'pep621', updateType: 'lockFileMaintenance' }, { ...SILENT, minimumReleaseAge: null }],
 ];
 
 for (const [name, upgrade, expected] of cases) {
