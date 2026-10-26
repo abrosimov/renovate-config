@@ -156,6 +156,11 @@
       "minimumReleaseAge": null
     },
     {
+      "description": "Lock file maintenance re-resolves the lock within the ranges already declared, so it is not a release and carries no release timestamp to age against: minimumReleaseAgeBehaviour: timestamp-required would hold it on renovate/stability-days indefinitely, as it does a digest. WARNING: clearing the age here clears the quarantine for the whole re-resolution, because Renovate hands it to the package manager and checks the age of nothing it brings back, the security:minimumReleaseAge presets included. A consuming repository keeps the week by setting it in the package manager itself (uv: [tool.uv] exclude-newer, pnpm: minimumReleaseAge)",
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "minimumReleaseAge": null
+    },
+    {
       "description": "A digest move under a tag that names no version — latest, alpine, stable — is not a rebuilt layer but whatever upstream released since, majors and schema migrations included, and it arrives with no quarantine because digests are exempt from one. It is therefore a decision. The durable answer is a versioned tag in the consuming repository, which turns the same move into an ordinary update with a type and an age. It leaves the digest group for the reason the pre-1.0 rule gives",
       "matchUpdateTypes": ["digest"],
       "matchDatasources": ["docker"],
