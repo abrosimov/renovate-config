@@ -245,10 +245,12 @@ What a consuming repository has to provide:
   repository without CI and for one whose CI does not run on every pull
   request; its routine updates still arrive as pull requests, and the merge
   button is the review.
-- **Auto-merge and merge commits allowed.** "Allow auto-merge" and "Allow
-  merge commits" must be enabled: Renovate asks the platform for the
-  `merge-commit` strategy this preset names, and a repository with either
-  switched off rejects the request and the pull request simply waits.
+- **Auto-merge and squash merging allowed.** "Allow auto-merge" and "Allow
+  squash merging" must be enabled: Renovate asks the platform for the
+  `squash` strategy this preset names, and a repository with either switched
+  off rejects the request and the pull request simply waits. Squash rather
+  than a merge commit because a Renovate branch is a single commit: squashing
+  it lands that commit, signed by GitHub, without an extra merge node.
 
 `rebaseWhen: "auto"` lets Renovate choose its rebase policy for each branch.
 Without a merge queue, automerging branches and branches whose protection
