@@ -50,3 +50,15 @@ jobs:
       # and the resolution of every preset in `extends` are checked either way,
       # and those are what actually break the fleet.
       - run: npx --yes --package renovate -- renovate-config-validator --strict default.json
+
+  # The one check the baseline ruleset from gh-repo-settings requires: it
+  # stands for every job above, so the ruleset names a single check however
+  # this workflow's jobs change.
+  required:
+    name: required
+    if: always()
+    needs: [config]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All jobs passed
+        run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = false
