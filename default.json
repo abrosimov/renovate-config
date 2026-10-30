@@ -24,7 +24,7 @@
   "automerge": true,
   "automergeType": "pr",
   "platformAutomerge": true,
-  "automergeStrategy": "merge-commit",
+  "automergeStrategy": "squash",
   "assignees": ["abrosimov"],
   "assignAutomerge": false,
 
