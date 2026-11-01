@@ -222,9 +222,18 @@ Python minor, that it was held fourteen days and how old the release now is.
 A routine update carries a `NOTE` that it merges itself once its checks pass
 and waits for a person if one fails; lock file maintenance adds that it
 re-resolves within the declared ranges with no quarantine, and that a
-conflict is cleared by the rebase box. A security fix carries a `CAUTION` to
-merge it promptly. Notes accumulate across every rule that matches, as labels
-do, which is why each one sits on exactly the rules that set its outcome.
+conflict is cleared by the rebase box. A security fix that is held for a
+decision adds a `CAUTION` to its reason, to merge it promptly anyway; one that
+merges itself needs nothing from anybody and adds nothing beyond the advisory
+details Renovate writes itself. Notes accumulate across every rule that
+matches, as labels do, which is why each one sits on exactly the rules that
+set its outcome.
+
+WARNING: the caution lives inside the decision notes rather than in
+`vulnerabilityAlerts`. Renovate raises a security fix by appending a rule per
+advisory that forces the `vulnerabilityAlerts` settings, and a forced value
+replaces the accumulated notes instead of adding to them, so a note set there
+would erase the decision reason and the advisory details alike.
 
 Titles carry a semantic prefix in every repository (`semanticCommits:
 "enabled"`), whatever that repository's own history looks like: `fix(deps):`
