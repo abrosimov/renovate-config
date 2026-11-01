@@ -45,8 +45,9 @@
   "dependencyDashboardOSVVulnerabilitySummary": "all",
   "vulnerabilityAlerts": {
     "enabled": true,
+    "description": "A security fix is still a dependency update, so it keeps the dependencies label and adds security. WARNING: both are listed under labels rather than security going under addLabels, because Renovate applies this block as force, which overwrites rather than merges: labels here replace the top-level ones, and addLabels here would wipe out the ecosystem, automerge and needs-decision labels the package rules add",
     "groupName": null,
-    "labels": ["security"],
+    "labels": ["dependencies", "security"],
     "dependencyDashboardApproval": false,
     "minimumReleaseAge": null,
     "prConcurrentLimit": 0
