@@ -11,13 +11,16 @@ record that Renovate is enabled while the policy itself stays central:
 ```json
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>abrosimov/renovate-config#v2.0.0"]
+  "extends": ["github>abrosimov/renovate-config#vX.Y.Z"]
 }
 ```
 
 `github>abrosimov/renovate-config` resolves to `default.json` in this
-repository's root, and the `#v2.0.0` suffix pins that resolution to a tag. See
-`Versioning` below for why the suffix is not optional.
+repository's root, and the `#vX.Y.Z` suffix pins that resolution to a tag.
+`vX.Y.Z` is a placeholder, not a version: replace it with the latest release,
+which the [releases page](https://github.com/abrosimov/renovate-config/releases/latest)
+shows, as does `gh release view -R abrosimov/renovate-config --json tagName`.
+See `Versioning` below for why the suffix is not optional.
 
 ## Versioning
 
@@ -75,8 +78,10 @@ That mechanism is also the reason the suffix is not optional: the manager
 skips a preset with no version to compare against, so an unpinned repository
 raises nothing and quietly tracks `master` instead.
 
-The tag in the example above is simply the current release; a repository is
-pinned to it once, by hand, and Renovate moves the pin from then on. A major
+The README names no version on purpose, because any version written here is
+out of date by the next release. A repository is pinned once, by hand, to
+whichever release is latest when it adopts the preset, and Renovate moves the
+pin from then on. A major
 release of this preset arrives in a consumer the same way any other major
 does, as an assigned pull request waiting for its merge button, which is what
 a policy change that needs a repository setting to be flipped should look
