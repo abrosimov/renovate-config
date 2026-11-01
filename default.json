@@ -27,7 +27,7 @@
   "platformAutomerge": true,
   "automergeStrategy": "squash",
   "assignees": ["abrosimov"],
-  "assignAutomerge": false,
+  "assignAutomerge": true,
 
   "rebaseWhen": "auto",
 
@@ -246,7 +246,7 @@
       "prBodyNotes": ["> [!IMPORTANT]\n> **Needs a decision: major update.** A major carries breaking changes by definition, so this is not merged automatically.{{#unless (or isVulnerabilityAlert (equals packageName 'abrosimov/renovate-config'))}} It was held for 14 days{{#if newVersionAgeInDays}}; {{depName}} {{newVersion}} is {{newVersionAgeInDays}} days old{{/if}}.{{/unless}} Read the release notes, then merge or close.{{#if isVulnerabilityAlert}}\n\n> [!CAUTION]\n> **Security fix.** The reason above still applies, but the vulnerability should not wait on it: merge promptly.{{/if}}"]
     },
     {
-      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own pull request, where a red check holds the merge and assigns it without anybody being asked in advance. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production. Language runtimes are not here either, although these managers extract them, because the runtime a setup action or a toolchain file installs is the one the product is built and tested on. Nor is the runner a workflow runs on: ubuntu-24.04 to ubuntu-26.04 in runs-on is a change of operating system for every job, the same move as a base image major, and the workflow manager extracts it alongside the actions",
+      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own pull request, where a red check holds the merge in front of its assignee without anybody being asked in advance. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production. Language runtimes are not here either, although these managers extract them, because the runtime a setup action or a toolchain file installs is the one the product is built and tested on. Nor is the runner a workflow runs on: ubuntu-24.04 to ubuntu-26.04 in runs-on is a change of operating system for every job, the same move as a base image major, and the workflow manager extracts it alongside the actions",
       "matchUpdateTypes": ["major"],
       "matchManagers": [
         "github-actions",
@@ -323,7 +323,7 @@
       "minimumReleaseAge": null
     },
     {
-      "description": "Anything that will merge itself says so on its pull request. Assignees are withheld from these by assignAutomerge: a pull request that merges itself needs no owner, and Renovate assigns one only when the checks go red, which is exactly when an owner is needed. The note repeats the label in words for whoever opens the pull request. WARNING: prBodyNotes accumulates across matching rules, so the note sits on exactly the rules that add the automerge label and on no others; a rule that withholds automerge has to keep these from matching rather than try to take the note back",
+      "description": "Anything that will merge itself says so on its pull request. It is assigned all the same, because assignAutomerge is on: an automerge can stall on a red check, a conflict or a status that never reports, and a pull request with no owner then sits open with nothing to surface it. Renovate's alternative assigns one only when a later run happens to see the checks red, which the run that pushed the commit does not, because its checks are still pending then, so one owner on every pull request from the start is what keeps a stalled one from falling through. The note repeats the label in words for whoever opens the pull request. WARNING: prBodyNotes accumulates across matching rules, so the note sits on exactly the rules that add the automerge label and on no others; a rule that withholds automerge has to keep these from matching rather than try to take the note back",
       "matchUpdateTypes": ["patch"],
       "matchCurrentVersion": "!/^v?0\\.0\\./",
       "addLabels": ["automerge"],
