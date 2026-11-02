@@ -28,28 +28,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Renovate's engines field tracks the current Node LTS and npx resolves
-      # the newest release that the installed Node satisfies, so pinning a Node
-      # version here would silently pin the validator to an older Renovate and
-      # defeat the scheduled run above.
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: lts/*
+      # The newest Renovate, on the Node its engines field accepts; the action
+      # explains why Node follows Renovate rather than the other way round.
+      - uses: ./.github/actions/renovate
+        id: renovate
       # The tests import Renovate's own package-rule matcher, so they judge the
-      # policy by the engine that will apply it, unpinned for the same reason
-      # as the validator below.
+      # policy by the engine that will apply it.
       - name: Test the policy against Renovate's rule engine
-        run: |
-          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/renovate" renovate
-          RENOVATE_DIR="$RUNNER_TEMP/renovate/node_modules/renovate" node --test tests/*.test.mjs
+        env:
+          RENOVATE_DIR: ${{ steps.renovate.outputs.dir }}
+        run: node --test tests/*.test.mjs
       # --strict fails on anything the validator would otherwise only warn
       # about, deprecated options among it. WARNING: a file passed by path is
       # validated as a global configuration, which is a superset of the
       # repository options, so a self-hosted-only option would pass here and
       # still be rejected in a consumer. Option names, manager names, regexes
       # and the resolution of every preset in `extends` are checked either way,
-      # and those are what actually break the fleet.
-      - run: npx --yes --package renovate -- renovate-config-validator --strict default.json
+      # and those are what actually break the fleet. It runs from the same
+      # install as the tests, so both judge the preset by one Renovate.
+      - name: Validate the preset
+        env:
+          RENOVATE_BIN: ${{ steps.renovate.outputs.bin }}
+        run: '"$RENOVATE_BIN/renovate-config-validator" --strict default.json'
 
   # The one check the baseline ruleset from gh-repo-settings requires: it
   # stands for every job above, so the ruleset names a single check however

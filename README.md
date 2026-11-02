@@ -387,6 +387,17 @@ breakage arrives without a commit to trigger anything. For the same reason the
 validator is deliberately unpinned: the check is only meaningful against the
 version the self-hosted runner is about to use.
 
+Unpinned means the newest release, named explicitly, never whatever npm
+settles on. Both workflows install Renovate through `.github/actions/renovate`,
+which reads the newest version and its `engines.node` from the registry, sets
+up a Node in that range and installs exactly that version with
+`--engine-strict`. Node therefore follows Renovate, not the Node LTS: Renovate's
+engines trail the LTS by months, and on a Node they do not accept, a bare
+`npm install renovate` quietly falls back to the newest release that does — on
+Node 26 that was 37.440.7, two years old. Asking for the exact version leaves
+npm nothing to fall back to, so a mismatch fails the install instead of
+passing the checks against an engine nobody runs.
+
 The repository also carries its own `renovate.json` pointing at its own preset,
 so the policy is applied to the workflow it just acquired and is exercised
 against live traffic rather than only asserted. It is the one place that
