@@ -12,20 +12,44 @@ assert.ok(renovateDir, 'RENOVATE_DIR must point at an installed renovate package
 const { applyPackageRules } = await import(
   pathToFileURL(join(renovateDir, 'dist/util/package-rules/index.js')).href
 );
+// Notes are rendered by Renovate's own template engine too, so a helper or a
+// field it does not expose fails here rather than on a pull request.
+const { compile } = await import(pathToFileURL(join(renovateDir, 'dist/util/template/index.js')).href);
 
 const preset = JSON.parse(readFileSync(new URL('../default.json', import.meta.url), 'utf8'));
 
-async function resolve(upgrade) {
-  const config = await applyPackageRules({ ...preset, ...upgrade }, 'update');
+async function resolve(upgrade, appendedRules = []) {
+  const config = await applyPackageRules(
+    { ...preset, packageRules: [...preset.packageRules, ...appendedRules], ...upgrade },
+    'update',
+  );
   const labels = config.addLabels ?? [];
+  const notes = config.prBodyNotes ?? [];
   return {
     automerge: config.automerge,
+    groupName: config.groupName,
     groupSlug: config.groupSlug,
     decision: labels.includes('needs-decision'),
     automergeLabel: labels.includes('automerge'),
     minimumReleaseAge: config.minimumReleaseAge,
+    notes,
+    rendered: notes.map((note) => compile(note, { ...config, ...upgrade }).trim()),
   };
 }
+
+// The headline of each note identifies it; the wording around it may change.
+const NOTE = {
+  pre1: '**Needs a decision: pre-1.0 package.**',
+  major: '**Needs a decision: major update.**',
+  pythonMinor: '**Needs a decision: Python minor.**',
+  unversioned: '**Needs a decision: unversioned image tag.**',
+  automerge: '**Merges itself**',
+  lockFile: '**Lock file maintenance**',
+};
+const noteKinds = (notes) =>
+  Object.entries(NOTE)
+    .filter(([, headline]) => notes.some((note) => note.includes(headline)))
+    .map(([kind]) => kind);
 
 const gomod = (depName, currentValue, updateType) => ({
   manager: 'gomod',
@@ -179,4 +203,153 @@ test('a decision opens a pull request rather than waiting for a dashboard tick',
   for (const rule of preset.packageRules) {
     assert.notEqual(rule.dependencyDashboardApproval, true, rule.description ?? JSON.stringify(rule));
   }
+});
+
+// prBodyNotes accumulates across matching rules like addLabels, so a note on
+// the wrong rule lands on pull requests it does not describe.
+test('every pull request explains itself, and only in the words of its own outcome', async () => {
+  const decisionNotes = new Set(['pre1', 'major', 'pythonMinor', 'unversioned']);
+  for (const [name, upgrade] of cases) {
+    const { decision, automergeLabel, notes } = await resolve(upgrade);
+    const kinds = noteKinds(notes);
+    assert.equal(kinds.some((kind) => decisionNotes.has(kind)), decision, `${name}: decision note, got ${kinds}`);
+    assert.equal(kinds.includes('automerge'), automergeLabel, `${name}: automerge note, got ${kinds}`);
+    assert.equal(kinds.filter((kind) => decisionNotes.has(kind)).length <= 1, true, `${name}: one reason, got ${kinds}`);
+  }
+});
+
+const noteCases = [
+  ['pre-1.0 npm minor', npm('lucide-react', 'dependencies', '0.563.0', 'minor'), ['pre1']],
+  ['0.0.x patch', pep621('pipecat-ai', 'project.dependencies', '0.0.105', 'patch'), ['pre1']],
+  ['Go module major', gomod('github.com/jackc/pgx/v5', 'v5.9.2', 'major'), ['major']],
+  ['Node runtime major in a toolchain file', { manager: 'mise', datasource: 'node-version', depName: 'node', packageName: 'node', currentValue: '22', currentVersion: '22', updateType: 'major' }, ['major']],
+  ['workflow action major, which merges itself', { manager: 'github-actions', datasource: 'github-tags', depType: 'action', depName: 'actions/checkout', packageName: 'actions/checkout', currentValue: 'v6', currentVersion: 'v6', updateType: 'major' }, ['automerge']],
+  ['npm development dependency major, which merges itself', npm('vite', 'devDependencies', '7.3.1', 'major'), ['automerge']],
+  ['Python runtime minor in a base image', docker('dockerfile', 'python', '3.13-slim', '3.13', 'minor'), ['pythonMinor']],
+  ['digest under latest', docker('docker-compose', 'temporalio/auto-setup', 'latest', undefined, 'digest'), ['unversioned']],
+  ['digest under a versioned tag', docker('docker-compose', 'postgres', '17-alpine', '17', 'digest'), ['automerge']],
+  ['stable Python patch', pep621('pydantic', 'project.dependencies', '2.10.1', 'patch'), ['automerge']],
+  ['stable Go module minor', gomod('github.com/jackc/pgx/v5', 'v5.9.2', 'minor'), ['automerge']],
+  ['this preset\'s own major', presetPin('abrosimov/renovate-config', 'v1.0.0', 'major'), ['major']],
+  ['lock file maintenance', { manager: 'pep621', updateType: 'lockFileMaintenance' }, ['automerge', 'lockFile']],
+];
+
+for (const [name, upgrade, expected] of noteCases) {
+  test(`${name} carries the ${expected.join(' and ')} note`, async () => {
+    const { notes } = await resolve(upgrade);
+    assert.deepEqual(noteKinds(notes).sort(), [...expected].sort());
+  });
+}
+
+test('every note is a GitHub alert block', async () => {
+  for (const [name, upgrade] of noteCases) {
+    for (const note of (await resolve(upgrade)).notes) {
+      assert.match(note, /^> \[!(NOTE|IMPORTANT|CAUTION)\]\n> \*\*/, name);
+    }
+  }
+});
+
+test('a held major says how long it was held and how old the release is', async () => {
+  const { rendered } = await resolve({
+    ...gomod('github.com/jackc/pgx/v5', 'v5.9.2', 'major'),
+    newVersion: 'v6.0.0',
+    newVersionAgeInDays: 15,
+  });
+  assert.equal(rendered.length, 1);
+  assert.match(rendered[0], /It was held for 14 days; github\.com\/jackc\/pgx\/v5 v6\.0\.0 is 15 days old\./);
+  assert.doesNotMatch(rendered[0], /\{\{/);
+});
+
+test('a major that was not held does not claim to have been', async () => {
+  const { rendered } = await resolve({ ...presetPin('abrosimov/renovate-config', 'v1.0.0', 'major'), newVersion: 'v2.0.0', newVersionAgeInDays: 0 });
+  assert.equal(rendered.length, 1);
+  assert.doesNotMatch(rendered[0], /held/);
+  assert.match(rendered[0], /not merged automatically\. Read the release notes, then merge or close\.$/);
+  const thirdParty = await resolve({ ...presetPin('example/renovate-config', 'v1.0.0', 'major'), newVersion: 'v2.0.0', newVersionAgeInDays: 20 });
+  assert.match(thirdParty.rendered[0], /held for 14 days/);
+});
+
+test('the unversioned tag note names the tag', async () => {
+  const { rendered } = await resolve(docker('docker-compose', 'temporalio/auto-setup', 'latest', undefined, 'digest'));
+  assert.match(rendered[0], /The digest behind `latest` moved\./);
+});
+
+test('pre-1.0 updates share a branch named for what they are', async () => {
+  for (const upgrade of [
+    npm('lucide-react', 'dependencies', '0.563.0', 'minor'),
+    pep621('pipecat-ai', 'project.dependencies', '0.0.105', 'patch'),
+  ]) {
+    const { groupName, groupSlug } = await resolve(upgrade);
+    assert.equal(groupName, 'pre-1.0 packages');
+    assert.equal(groupSlug, 'pre-1-0-minor', 'the slug names the branch, so it must not move');
+  }
+});
+
+// Both alert channels raise a security fix by appending one rule per advisory
+// after the preset's own, carrying the advisory's notes and
+// force: { ...vulnerabilityAlerts } (lib/workers/repository/init/vulnerability.ts,
+// lib/workers/repository/process/vulnerabilities.ts). A forced value replaces
+// the accumulated one rather than adding to it, which is the trap these cover.
+const ADVISORY = 'Advisory details written by Renovate';
+const securityFix = (upgrade) =>
+  resolve(upgrade, [
+    {
+      matchDatasources: [upgrade.datasource],
+      matchPackageNames: [upgrade.packageName],
+      isVulnerabilityAlert: true,
+      prBodyNotes: [ADVISORY],
+      force: { ...preset.vulnerabilityAlerts },
+    },
+  ]);
+const CAUTION = /\n\n> \[!CAUTION\]\n> \*\*Security fix\.\*\* [^\n]*merge promptly\.$/;
+
+test('vulnerabilityAlerts sets no notes, because its values are forced over every rule', () => {
+  assert.equal(preset.vulnerabilityAlerts.prBodyNotes, undefined);
+});
+
+test('a pre-1.0 security fix keeps its reason, the advisory and a caution', async () => {
+  const { rendered, notes } = await securityFix({ ...gomod('github.com/nexus-rpc/sdk-go', 'v0.6.0', 'minor'), newVersion: 'v0.7.0' });
+  assert.deepEqual(noteKinds(notes), ['pre1']);
+  assert.ok(rendered.includes(ADVISORY));
+  const reason = rendered.find((note) => note.includes(NOTE.pre1));
+  assert.match(reason, CAUTION);
+});
+
+test('a major security fix keeps its reason without claiming a hold', async () => {
+  const { rendered, notes, minimumReleaseAge } = await securityFix({
+    ...gomod('github.com/jackc/pgx/v5', 'v5.9.2', 'major'),
+    newVersion: 'v6.0.0',
+    newVersionAgeInDays: 1,
+  });
+  assert.equal(minimumReleaseAge, null, 'the caution is only true while security fixes skip the quarantine');
+  assert.deepEqual(noteKinds(notes), ['major']);
+  assert.ok(rendered.includes(ADVISORY));
+  const reason = rendered.find((note) => note.includes(NOTE.major));
+  assert.doesNotMatch(reason, /held/);
+  assert.match(reason, CAUTION);
+});
+
+test('a security fix that merges itself says so and asks for nothing', async () => {
+  const { rendered, notes } = await securityFix({ ...pep621('pydantic', 'project.dependencies', '2.10.1', 'patch'), newVersion: '2.10.2' });
+  assert.deepEqual(noteKinds(notes), ['automerge']);
+  assert.ok(rendered.includes(ADVISORY));
+  assert.ok(rendered.every((note) => !note.includes('[!CAUTION]')));
+});
+
+test('an ordinary decision carries no security caution', async () => {
+  const { rendered } = await resolve(gomod('github.com/jackc/pgx/v5', 'v5.9.2', 'major'));
+  assert.ok(rendered.every((note) => !note.includes('[!CAUTION]')));
+});
+
+test('titles carry a semantic prefix in every repository', () => {
+  assert.equal(preset.semanticCommits, 'enabled');
+});
+
+test('the dashboard header explains the sections and imitates none of its controls', () => {
+  const header = preset.dependencyDashboardHeader;
+  assert.ok(header, 'dependencyDashboardHeader must be set');
+  for (const section of ['Pending Status Checks', 'Open']) {
+    assert.ok(header.includes(`**${section}**`), section);
+  }
+  assert.doesNotMatch(header, /<!--|- \[[ x]\]/, 'Renovate parses its own markers and checkboxes out of the issue body');
 });

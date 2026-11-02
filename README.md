@@ -160,6 +160,15 @@ skips the quarantine, the schedule and every rate limit.
 So does a move of this preset's own pin, majors included, because the release
 was reviewed and validated here before it was tagged; see `Versioning`.
 
+An update still in quarantine is listed on the Dependency Dashboard under
+Pending Status Checks, and ticking its box opens the pull request at once,
+skipping the rest of the window. The dashboard's header, which the preset
+sets, says so, together with what the `needs-decision` and `automerge`
+pull requests under Open are waiting for and that a stuck pull request is
+retried by ticking its box there. The header deliberately contains no
+checkbox or HTML comment of its own, because Renovate reads its controls back
+out of the issue body.
+
 ## The grouping
 
 Non-major updates are grouped by ecosystem, one branch each: Go modules,
@@ -204,6 +213,33 @@ two put anything in front of a person.
    request at once, assigned and labelled `needs-decision`, with the checks
    already running. The decision is the merge button; there is no Dependency
    Dashboard tick to give first.
+
+Every pull request also says which outcome it got, in a note at the top of
+its body, so the owner does not have to work it out from the labels. A
+decision carries an `IMPORTANT` alert naming its reason — a major, a pre-1.0
+package, a Python minor, an unversioned image tag — and, for a major or a
+Python minor, that it was held fourteen days and how old the release now is.
+A routine update carries a `NOTE` that it merges itself once its checks pass
+and waits for a person if one fails; lock file maintenance adds that it
+re-resolves within the declared ranges with no quarantine, and that a
+conflict is cleared by the rebase box. A security fix that is held for a
+decision adds a `CAUTION` to its reason, to merge it promptly anyway; one that
+merges itself needs nothing from anybody and adds nothing beyond the advisory
+details Renovate writes itself. Notes accumulate across every rule that
+matches, as labels do, which is why each one sits on exactly the rules that
+set its outcome.
+
+WARNING: the caution lives inside the decision notes rather than in
+`vulnerabilityAlerts`. Renovate raises a security fix by appending a rule per
+advisory that forces the `vulnerabilityAlerts` settings, and a forced value
+replaces the accumulated notes instead of adding to them, so a note set there
+would erase the decision reason and the advisory details alike.
+
+Titles carry a semantic prefix in every repository (`semanticCommits:
+"enabled"`), whatever that repository's own history looks like: `fix(deps):`
+for a runtime dependency and `chore(deps):` for everything else, the split the
+base configuration already makes, so a release workflow that derives its
+version from commit types treats a dependency fix as a patch.
 
 What counts as a decision:
 
@@ -320,7 +356,9 @@ an installed Renovate package. The tests feed representative updates — a Go
 module minor, a pre-1.0 npm minor, a Python runtime minor in a base image, a
 Node major in a setup action, a digest under `latest` and so on — through
 Renovate's own `applyPackageRules`, and check which of the three outcomes each
-one gets, its group, and that its labels agree with its behaviour. The real
+one gets, its group, that its labels agree with its behaviour, and that its
+pull request notes agree with both, rendered through Renovate's own template
+engine. The real
 matcher is used rather than a copy because negated globs, fields an update
 does not have, and label accumulation are exactly where an approximation and
 the engine disagree. The import reaches into Renovate's internals, so a
