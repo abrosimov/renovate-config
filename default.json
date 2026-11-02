@@ -245,7 +245,7 @@
       "prBodyNotes": ["> [!IMPORTANT]\n> **Needs a decision: major update.** A major carries breaking changes by definition, so this is not merged automatically.{{#unless (or isVulnerabilityAlert (equals packageName 'abrosimov/renovate-config'))}} It was held for 14 days{{#if newVersionAgeInDays}}; {{depName}} {{newVersion}} is {{newVersionAgeInDays}} days old{{/if}}.{{/unless}} Read the release notes, then merge or close.{{#if isVulnerabilityAlert}}\n\n> [!CAUTION]\n> **Security fix.** The reason above still applies, but the vulnerability should not wait on it: merge promptly.{{/if}}"]
     },
     {
-      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own pull request, where a red check holds the merge and assigns it without anybody being asked in advance. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production. Language runtimes are not here either, although these managers extract them, because the runtime a setup action or a toolchain file installs is the one the product is built and tested on",
+      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own pull request, where a red check holds the merge and assigns it without anybody being asked in advance. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production. Language runtimes are not here either, although these managers extract them, because the runtime a setup action or a toolchain file installs is the one the product is built and tested on. Nor is the runner a workflow runs on: ubuntu-24.04 to ubuntu-26.04 in runs-on is a change of operating system for every job, the same move as a base image major, and the workflow manager extracts it alongside the actions",
       "matchUpdateTypes": ["major"],
       "matchManagers": [
         "github-actions",
@@ -256,6 +256,7 @@
         "rust-toolchain"
       ],
       "matchDepNames": ["!go", "!golang", "!node", "!python"],
+      "matchDatasources": ["!github-runners"],
       "minimumReleaseAge": "14 days",
       "automerge": true,
       "addLabels": ["automerge"],
@@ -288,6 +289,15 @@
         "rust-toolchain"
       ],
       "matchDepNames": ["go", "golang", "node", "python"],
+      "minimumReleaseAge": "14 days",
+      "automerge": false,
+      "addLabels": ["needs-decision"],
+      "prBodyNotes": ["> [!IMPORTANT]\n> **Needs a decision: major update.** A major carries breaking changes by definition, so this is not merged automatically.{{#unless (or isVulnerabilityAlert (equals packageName 'abrosimov/renovate-config'))}} It was held for 14 days{{#if newVersionAgeInDays}}; {{depName}} {{newVersion}} is {{newVersionAgeInDays}} days old{{/if}}.{{/unless}} Read the release notes, then merge or close.{{#if isVulnerabilityAlert}}\n\n> [!CAUTION]\n> **Security fix.** The reason above still applies, but the vulnerability should not wait on it: merge promptly.{{/if}}"]
+    },
+    {
+      "description": "The runner majors the toolchain rule leaves out, decided like a base image major and carrying the same note as any other major. WARNING: the runner is matched on its datasource rather than its name, because the workflow manager names it by its bare operating system — ubuntu, windows, macos — and names a job's container: image the same way, so a name would catch the ubuntu image as well. Every runner move is a major in practice: the images are versioned by operating system release, which docker versioning reads as the major",
+      "matchUpdateTypes": ["major"],
+      "matchDatasources": ["github-runners"],
       "minimumReleaseAge": "14 days",
       "automerge": false,
       "addLabels": ["needs-decision"],

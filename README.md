@@ -250,8 +250,10 @@ What counts as a decision:
   development groups (`[dependency-groups]`, uv's and PDM's dev dependencies).
   All of them break the pipeline inside their own pull request. Base images are
   deliberately not exempt: a major there is a change of operating system,
-  which passes the checks and surfaces in production instead. Nor are language
-  runtimes, even where a toolchain manager or a setup action is what pins them.
+  which passes the checks and surfaces in production instead. The same goes for
+  the runner a workflow runs on (`runs-on: ubuntu-24.04` to `ubuntu-26.04`),
+  although it lives among the workflow actions. Nor are language runtimes,
+  even where a toolchain manager or a setup action is what pins them.
   The fourteen-day quarantine applies to every major either way, except a
   major of this preset, which was reviewed here before it was tagged.
 - A pre-1.0 minor, and a patch below 0.1, because semver gives them no

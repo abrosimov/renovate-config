@@ -102,6 +102,21 @@ const presetPin = (depName, currentValue, updateType) => ({
   updateType,
 });
 
+// The shape the github-actions manager gives a runs-on label: the bare
+// operating system as depName and its release as the version
+// (renovate/dist/modules/manager/github-actions/extract.js, extractRunner).
+const runner = (depName, currentValue) => ({
+  manager: 'github-actions',
+  datasource: 'github-runners',
+  versioning: 'docker',
+  depType: 'github-runner',
+  depName,
+  packageName: depName,
+  currentValue,
+  currentVersion: currentValue,
+  updateType: 'major',
+});
+
 const SILENT = { automerge: true, decision: false, automergeLabel: true };
 const DECISION = { automerge: false, decision: true, automergeLabel: false };
 
@@ -128,6 +143,10 @@ const cases = [
   ['Go runtime minor in a base image', docker('dockerfile', 'golang', '1.27-alpine', '1.27', 'minor'), { ...SILENT, groupSlug: 'go-runtime' }],
 
   ['workflow action major', { manager: 'github-actions', datasource: 'github-tags', depType: 'action', depName: 'actions/checkout', packageName: 'actions/checkout', currentValue: 'v6', currentVersion: 'v6', updateType: 'major' }, { ...SILENT, minimumReleaseAge: '14 days' }],
+  ['Ubuntu runner major', runner('ubuntu', '24.04'), { ...DECISION, minimumReleaseAge: '14 days' }],
+  ['Ubuntu arm runner major', runner('ubuntu', '24.04-arm'), { ...DECISION, minimumReleaseAge: '14 days' }],
+  ['Windows runner major', runner('windows', '2022'), { ...DECISION, minimumReleaseAge: '14 days' }],
+  ['macOS runner major', runner('macos', '15'), { ...DECISION, minimumReleaseAge: '14 days' }],
   ['npm development dependency major', npm('vite', 'devDependencies', '7.3.1', 'major'), { ...SILENT, minimumReleaseAge: '14 days' }],
   ['Python development dependency major', pep621('mypy-protobuf', 'dependency-groups', '3.6.0', 'major'), { ...SILENT, minimumReleaseAge: '14 days' }],
   ['npm runtime dependency major', npm('react-router-dom', 'dependencies', '7.13.0', 'major'), { ...DECISION, minimumReleaseAge: '14 days' }],
