@@ -34,6 +34,7 @@ async function resolve(upgrade, appendedRules = []) {
     minimumReleaseAge: config.minimumReleaseAge,
     notes,
     rendered: notes.map((note) => compile(note, { ...config, ...upgrade }).trim()),
+    prLabels: [...new Set([...(config.labels ?? []), ...labels])].sort(),
   };
 }
 
@@ -50,6 +51,25 @@ const noteKinds = (notes) =>
   Object.entries(NOTE)
     .filter(([, headline]) => notes.some((note) => note.includes(headline)))
     .map(([kind]) => kind);
+
+// Both alert channels raise a security fix by appending one rule per advisory
+// after the preset's own, carrying the advisory's notes and
+// force: { ...vulnerabilityAlerts } (lib/workers/repository/init/vulnerability.ts,
+// lib/workers/repository/process/vulnerabilities.ts). Force is spread over the
+// merged result rather than merged into it (lib/config/utils.ts), so a forced
+// value replaces the accumulated one rather than adding to it: this is where
+// the block's labels and notes meet the package rules' own.
+const ADVISORY = 'Advisory details written by Renovate';
+const securityFix = (upgrade) =>
+  resolve(upgrade, [
+    {
+      matchDatasources: [upgrade.datasource],
+      matchPackageNames: [upgrade.packageName],
+      isVulnerabilityAlert: true,
+      prBodyNotes: [ADVISORY],
+      force: { ...preset.vulnerabilityAlerts },
+    },
+  ]);
 
 const gomod = (depName, currentValue, updateType) => ({
   manager: 'gomod',
@@ -210,6 +230,16 @@ for (const [version, preOne] of [
   }
 }
 
+for (const [name, upgrade, expected] of [
+  ['pre-1.0 Go minor', { ...gomod('github.com/nexus-rpc/sdk-go', 'v0.6.0', 'minor'), versioning: 'semver' }, ['dependencies', 'gomod', 'needs-decision', 'security']],
+  ['stable Python patch', { ...pep621('pydantic', 'project.dependencies', '2.10.1', 'patch'), versioning: 'pep440' }, ['automerge', 'dependencies', 'python', 'security']],
+  ['npm runtime dependency major', { ...npm('react-router-dom', 'dependencies', '6.30.0', 'major'), versioning: 'npm' }, ['dependencies', 'needs-decision', 'security']],
+]) {
+  test(`security fix for a ${name} keeps the dependencies label and the package rules' labels`, async () => {
+    assert.deepEqual((await securityFix(upgrade)).prLabels, expected);
+  });
+}
+
 test('routine updates merge through a pull request, and only a failing one is assigned', () => {
   assert.equal(preset.automerge, true);
   assert.equal(preset.automergeType, 'pr');
@@ -304,22 +334,6 @@ test('pre-1.0 updates share a branch named for what they are', async () => {
   }
 });
 
-// Both alert channels raise a security fix by appending one rule per advisory
-// after the preset's own, carrying the advisory's notes and
-// force: { ...vulnerabilityAlerts } (lib/workers/repository/init/vulnerability.ts,
-// lib/workers/repository/process/vulnerabilities.ts). A forced value replaces
-// the accumulated one rather than adding to it, which is the trap these cover.
-const ADVISORY = 'Advisory details written by Renovate';
-const securityFix = (upgrade) =>
-  resolve(upgrade, [
-    {
-      matchDatasources: [upgrade.datasource],
-      matchPackageNames: [upgrade.packageName],
-      isVulnerabilityAlert: true,
-      prBodyNotes: [ADVISORY],
-      force: { ...preset.vulnerabilityAlerts },
-    },
-  ]);
 const CAUTION = /\n\n> \[!CAUTION\]\n> \*\*Security fix\.\*\* [^\n]*merge promptly\.$/;
 
 test('vulnerabilityAlerts sets no notes, because its values are forced over every rule', () => {
