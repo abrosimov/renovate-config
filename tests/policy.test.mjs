@@ -240,6 +240,120 @@ for (const [name, upgrade, expected] of [
   });
 }
 
+// workers/repository/updates/generate.js: a branch automerges only when every
+// upgrade in it does, and its labels are the union of its upgrades' labels.
+async function branches(upgrades, repositoryRules = []) {
+  const config = { ...preset, packageRules: [...preset.packageRules, ...repositoryRules] };
+  const byBranch = new Map();
+  for (const upgrade of upgrades) {
+    const resolved = await applyPackageRules({ ...config, ...upgrade }, 'update');
+    const slug = resolved.groupSlug ?? `${upgrade.depName}-${upgrade.updateType}`;
+    byBranch.set(slug, [...(byBranch.get(slug) ?? []), resolved]);
+  }
+  return new Map(
+    [...byBranch].map(([slug, members]) => [
+      slug,
+      {
+        size: members.length,
+        automerge: members.every((member) => member.automerge),
+        labels: [...new Set(members.flatMap((member) => [...(member.labels ?? []), ...(member.addLabels ?? [])]))],
+      },
+    ]),
+  );
+}
+
+// The Collector release in otelcol-otelbox#34: v1 core modules, v0 core modules
+// and v0 contrib modules, released together.
+const contrib = 'github.com/open-telemetry/opentelemetry-collector-contrib/';
+const core = 'go.opentelemetry.io/collector/';
+const collectorRelease = [
+  ...['exporter/fileexporter', 'extension/bearertokenauthextension', 'extension/headerssetterextension', 'extension/healthcheckv2extension', 'extension/storage/filestorage', 'processor/filterprocessor', 'processor/redactionprocessor', 'processor/resourcedetectionprocessor', 'processor/resourceprocessor', 'processor/transformprocessor', 'receiver/hostmetricsreceiver', 'receiver/journaldreceiver', 'receiver/prometheusreceiver']
+    .map((module) => gomod(contrib + module, 'v0.162.0', 'minor')),
+  ...['component', 'config/configoptional', 'consumer', 'exporter', 'pdata']
+    .map((module) => gomod(core + module, 'v1.68.0', 'minor')),
+  ...['component/componenttest', 'consumer/consumererror', 'exporter/exporterhelper', 'exporter/exportertest', 'exporter/otlpexporter', 'exporter/otlphttpexporter', 'processor/memorylimiterprocessor', 'receiver/otlpreceiver']
+    .map((module) => gomod(core + module, 'v0.162.0', 'minor')),
+];
+// otelcol-otelbox's own rule at the time: one branch per Collector release,
+// automerge restored over the preset's pre-1.0 withholding.
+const collectorRule = {
+  matchDatasources: ['go'],
+  matchPackageNames: ['go.opentelemetry.io/collector', 'go.opentelemetry.io/collector/**', `${contrib}**`],
+  matchUpdateTypes: ['minor', 'patch'],
+  groupName: 'OpenTelemetry Collector',
+  groupSlug: 'otel-collector',
+  automerge: true,
+};
+
+test('a Collector release splits into its v1 modules, which merge, and its v0 modules, which ask', async () => {
+  const result = await branches(collectorRelease);
+  assert.deepEqual([...result.keys()].sort(), ['gomod', 'pre-1-0-minor']);
+  assert.deepEqual(result.get('gomod'), { size: 5, automerge: true, labels: ['dependencies', 'gomod', 'automerge'] });
+  assert.equal(result.get('pre-1-0-minor').size, 21);
+  assert.equal(result.get('pre-1-0-minor').automerge, false);
+  assert.ok(result.get('pre-1-0-minor').labels.includes('needs-decision'));
+});
+
+// The trap behind otelcol-otelbox#34, pinned so that the README's warning goes
+// when Renovate stops accumulating labels across rules.
+test('a repository rule that restores automerge keeps the needs-decision label the preset added', async () => {
+  const result = await branches(collectorRelease, [collectorRule]);
+  assert.deepEqual([...result.keys()], ['otel-collector']);
+  const branch = result.get('otel-collector');
+  assert.equal(branch.size, 26);
+  assert.equal(branch.automerge, true);
+  assert.ok(branch.labels.includes('needs-decision'));
+});
+
+test('a repository rule that restores automerge and resets the labels leaves no needs-decision on a merging branch', async () => {
+  const remedy = { ...collectorRule, labels: ['dependencies', 'gomod', 'automerge'], addLabels: null };
+  const branch = (await branches(collectorRelease, [remedy])).get('otel-collector');
+  assert.equal(branch.automerge, true);
+  assert.deepEqual(branch.labels.sort(), ['automerge', 'dependencies', 'gomod']);
+});
+
+test('no branch the preset forms both asks for a decision and merges itself', async () => {
+  const result = await branches([...cases.map(([, upgrade]) => upgrade), ...collectorRelease]);
+  for (const [slug, branch] of result) {
+    assert.ok(!(branch.labels.includes('needs-decision') && branch.automerge), slug);
+  }
+});
+
+test('no update across managers, versions and update types both asks for a decision and merges itself', async () => {
+  const datasources = {
+    gomod: 'go',
+    npm: 'npm',
+    pep621: 'pypi',
+    'github-actions': 'github-tags',
+    dockerfile: 'docker',
+    'docker-compose': 'docker',
+    mise: 'github-tags',
+    'pre-commit': 'github-tags',
+    cargo: 'crate',
+    'renovate-config': 'github-tags',
+    regex: 'go',
+  };
+  const names = ['example/pkg', 'golang.org/x/net', `${core}pdata`, `${contrib}receiver/x`, 'opentelemetry-instrumentation-grpc', 'go', 'node', 'python', 'abrosimov/renovate-config'];
+  const versions = [['0.0.3', '0.0.3'], ['v0.5.0', 'v0.5.0'], ['1.2.0', '1.2.0'], ['latest', undefined], ['17-alpine', '17']];
+  const updateTypes = ['major', 'minor', 'patch', 'digest', 'pin', 'pinDigest', 'lockFileMaintenance'];
+  const depTypes = [undefined, 'dependencies', 'devDependencies', 'dependency-groups'];
+  for (const [manager, datasource] of Object.entries(datasources)) {
+    for (const depName of names) {
+      for (const [currentValue, currentVersion] of versions) {
+        for (const updateType of updateTypes) {
+          for (const depType of depTypes) {
+            const upgrade = { manager, datasource, depName, packageName: depName, currentValue, currentVersion, updateType, depType };
+            const { automerge, decision, automergeLabel } = await resolve(upgrade);
+            const name = JSON.stringify(upgrade);
+            assert.ok(!decision || automerge === false, `needs-decision without withholding automerge: ${name}`);
+            assert.ok(!(decision && automergeLabel), `both labels: ${name}`);
+          }
+        }
+      }
+    }
+  }
+});
+
 test('routine updates merge through a pull request, and every pull request is assigned', () => {
   assert.equal(preset.automerge, true);
   assert.equal(preset.automergeType, 'pr');

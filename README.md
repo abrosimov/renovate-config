@@ -403,3 +403,23 @@ A repository that needs something different keeps its own settings beside the
 `extends` line; a repository-level value wins over the preset. `setup_lab` does
 this: it adds custom managers for its digest-pinned container images and holds
 its stateful backends behind an explicit upgrade decision.
+
+WARNING: labels are the exception. `addLabels` accumulates across every
+matching rule rather than being replaced, so a repository rule that sets
+`automerge: true` on an update the preset holds for a decision restores the
+merge but keeps the `needs-decision` label, and the pull request then merges
+itself while still announcing a decision nobody made. `otelcol-otelbox` did
+exactly this to move each Collector release, v0 modules included, as one
+self-merging branch. A rule that restores automerge resets the labels in the
+same rule — `"addLabels": null` clears what the preset added, and `labels`
+states the full set the branch should carry instead:
+
+```json
+{
+  "matchPackageNames": ["go.opentelemetry.io/collector/**"],
+  "matchUpdateTypes": ["minor", "patch"],
+  "automerge": true,
+  "labels": ["dependencies", "gomod", "automerge"],
+  "addLabels": null
+}
+```
