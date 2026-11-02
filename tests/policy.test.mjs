@@ -240,12 +240,19 @@ for (const [name, upgrade, expected] of [
   });
 }
 
-test('routine updates merge through a pull request, and only a failing one is assigned', () => {
+test('routine updates merge through a pull request, and every pull request is assigned', () => {
   assert.equal(preset.automerge, true);
   assert.equal(preset.automergeType, 'pr');
   assert.equal(preset.platformAutomerge, true);
-  assert.equal(preset.assignAutomerge, false);
-  assert.ok(preset.assignees?.length, 'a failing pull request needs somebody to assign');
+  assert.equal(preset.assignAutomerge, true, 'a stalled automerge needs an owner already in place');
+  assert.deepEqual(preset.assignees, ['abrosimov']);
+});
+
+test('no rule withholds the assignee from a pull request', () => {
+  for (const config of [preset.vulnerabilityAlerts, ...preset.packageRules]) {
+    assert.ok(!('assignees' in config), config.description ?? JSON.stringify(config));
+    assert.ok(!('assignAutomerge' in config), config.description ?? JSON.stringify(config));
+  }
 });
 
 test('a decision opens a pull request rather than waiting for a dashboard tick', () => {

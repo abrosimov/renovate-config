@@ -193,21 +193,34 @@ the runtime's minors and patches.
 ## Merging and triage
 
 The policy sorts every update into one of three outcomes, and only the last
-two put anything in front of a person.
+two ask anything of a person. Every pull request has an owner from the moment
+it opens, whichever outcome it falls into: it is assigned to the repository
+owner on creation (`assignees` with `assignAutomerge: true`), including the
+ones that will merge themselves.
 
-1. **Routine: nothing to see.** Minor, patch, digest and pin updates, lock
+The assignment is unconditional because an automerge can stall in more ways
+than a red check — a conflict, a required status that never reports, an
+auto-merge that was never switched on — and a pull request that nobody owns
+then sits open with nothing to surface it. Renovate's alternative, assigning a
+self-merging pull request only once its checks fail, depends on a later run
+seeing the failure: the run that pushes a commit sees the checks still
+pending, and an unchanged pull request is not looked at again on every run.
+One owner on every pull request means the assigned list is the one place to
+look, and nothing falls out of it. The cost is a notification for every pull
+request, routine ones included.
+
+1. **Routine: nothing to do.** Minor, patch, digest and pin updates, lock
    file maintenance, and the majors listed below as decided by the checks.
    Once the quarantine has elapsed Renovate opens a pull request, labelled
-   `automerge` and unassigned, with the platform's native auto-merge enabled
+   `automerge`, with the platform's native auto-merge enabled
    (`automergeType: "pr"`, `platformAutomerge: true`). The repository's checks
    and branch protection run on it as on any other pull request, and GitHub
-   merges it once they pass. Nothing reaches the base branch without a pull
-   request.
-2. **Routine that failed: an assigned pull request.** When a check goes red,
-   the pull request stays open and Renovate assigns it (`assignees` with
-   `assignAutomerge: false`, which withholds assignees only while the checks
-   are passing or pending). This is the one notification a routine update
-   produces, and it means something broke.
+   merges it once they pass, which also takes it off the assigned list.
+   Nothing reaches the base branch without a pull request.
+2. **Routine that stalled: the same pull request, still open.** When a check
+   goes red, the branch conflicts or a status never arrives, the pull request
+   stays open where it already is, assigned. An `automerge` pull request that
+   is still on the assigned list means something broke.
 3. **Decision: an assigned pull request, straight away.** A major, a pre-1.0
    update, a Python minor and a digest under an unversioned tag open a pull
    request at once, assigned and labelled `needs-decision`, with the checks
