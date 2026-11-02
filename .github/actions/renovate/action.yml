@@ -38,7 +38,6 @@ runs:
         manifest="$(curl -fsSL --retry 3 https://registry.npmjs.org/renovate/latest)"
         version="$(jq -er '.version' <<< "$manifest")"
         node="$(jq -er '.engines.node' <<< "$manifest")"
-        node=">=26"
         echo "Renovate $version requires Node $node"
         echo "version=$version" >> "$GITHUB_OUTPUT"
         echo "node=$node" >> "$GITHUB_OUTPUT"
