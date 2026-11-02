@@ -1,0 +1,68 @@
+name: Newest Renovate
+description: >-
+  Installs the newest Renovate release on a Node version its own engines field
+  accepts, and fails rather than settle for an older Renovate.
+
+# The checks are only meaningful against the Renovate that is about to apply
+# the preset, which is the newest one, so the version is never pinned. Node is
+# not chosen independently of it: Renovate's engines field trails the Node LTS
+# by months, and npm, asked for a bare `renovate` on a Node the newest release
+# does not accept, quietly installs the newest one that does. On Node 26 that
+# was 37.440.7, two years old, and every policy test failed against it. So the
+# release is resolved first, Node follows its engines, and the install names
+# the exact version under --engine-strict, which leaves npm nothing to fall
+# back to. When Renovate widens its engines to the next LTS, Node follows on
+# the next run without a commit here.
+
+outputs:
+  version:
+    description: The Renovate version that was installed
+    value: ${{ steps.resolve.outputs.version }}
+  dir:
+    description: Path to the installed renovate package, for tests that import its internals
+    value: ${{ steps.install.outputs.dir }}
+  bin:
+    description: Directory holding Renovate's executables, renovate-config-validator among them
+    value: ${{ steps.install.outputs.bin }}
+
+runs:
+  using: composite
+  steps:
+    # Version and engines come from the same registry document, so they cannot
+    # describe two different releases.
+    - name: Resolve the newest Renovate and the Node it accepts
+      id: resolve
+      shell: bash
+      run: |
+        set -euo pipefail
+        manifest="$(curl -fsSL --retry 3 https://registry.npmjs.org/renovate/latest)"
+        version="$(jq -er '.version' <<< "$manifest")"
+        node="$(jq -er '.engines.node' <<< "$manifest")"
+        echo "Renovate $version requires Node $node"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "node=$node" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ steps.resolve.outputs.node }}
+
+    - name: Install Renovate
+      id: install
+      shell: bash
+      env:
+        VERSION: ${{ steps.resolve.outputs.version }}
+      run: |
+        set -euo pipefail
+        prefix="$RUNNER_TEMP/renovate"
+        npm install --engine-strict --no-save --no-audit --no-fund --prefix "$prefix" "renovate@$VERSION"
+
+        dir="$prefix/node_modules/renovate"
+        installed="$(jq -er '.version' "$dir/package.json")"
+        if [ "$installed" != "$VERSION" ]; then
+          echo "::error::Asked for Renovate $VERSION, got $installed"
+          exit 1
+        fi
+
+        echo "Renovate $installed on Node $(node --version)" >> "$GITHUB_STEP_SUMMARY"
+        echo "dir=$dir" >> "$GITHUB_OUTPUT"
+        echo "bin=$prefix/node_modules/.bin" >> "$GITHUB_OUTPUT"
