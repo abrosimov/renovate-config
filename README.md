@@ -183,12 +183,33 @@ configuration to decide `major`, which is the case where moving a monorepo's
 packages together actually matters.
 
 Language runtimes cut across the ecosystems and are grouped by name instead:
-`go` and `golang`, `node`, `python`. A repository pins its runtime in several
-places at once — the `go` directive and the `golang` image, a setup action's
-input, `engines`, a version file, a toolchain manager — and grouping by name
-moves all of them in one commit, so a build never mixes two versions of the
-same runtime. A runtime major still gets a branch of its own, separate from
-the runtime's minors and patches.
+`go` and `golang`, `node`, `python`, `rust`. A repository pins its runtime in
+several places at once — the `go` directive and the `golang` image, a setup
+action's input, `engines`, a version file, a toolchain manager — and grouping
+by name moves all of them in one commit, so a build never mixes two versions
+of the same runtime. A runtime major still gets a branch of its own, separate
+from the runtime's minors and patches.
+
+A runtime is always taken forward, its feature releases and majors included,
+and merges itself like any routine update: a repository that falls behind its
+language only faces a larger jump later, and the checks on the pull request
+are what answer whether the code still builds on the new version. What it is
+never moved onto is the first build of a feature release, where the
+regressions its first patch fixes are found. `allowedVersions` filters that
+build out, so the update waits for the patch rather than for a person:
+
+- Go and Python ship their feature release on the minor, so any `X.Y.0` —
+  `1.27.0`, `3.14.0` — is skipped and `1.27.1`, `3.14.1` is taken.
+- Node ships its feature release on the major, so only `X.0.0` is skipped.
+  Its minors are ordinary releases that often get no patch before the next
+  minor, and holding every `X.Y.0` would leave Node a minor behind for good.
+- Rust is not filtered: a Rust release is a `1.Y.0` that usually never gets a
+  `1.Y.1`, so a filter would keep it from moving at all.
+
+The filter reads the version, so a pin with no patch level —
+`golang:1.27-alpine`, `python:3.14-slim`, `go-version: '1.27'` — moves on the
+feature release's first day, held only by the quarantine. A runtime major and
+a Python minor keep the fourteen-day quarantine of a major.
 
 ## Merging and triage
 
@@ -222,7 +243,7 @@ request, routine ones included.
    stays open where it already is, assigned. An `automerge` pull request that
    is still on the assigned list means something broke.
 3. **Decision: an assigned pull request, straight away.** A major, a pre-1.0
-   update, a Python minor and a digest under an unversioned tag open a pull
+   update and a digest under an unversioned tag open a pull
    request at once, assigned and labelled `needs-decision`, with the checks
    already running. The decision is the merge button; there is no Dependency
    Dashboard tick to give first.
@@ -230,8 +251,8 @@ request, routine ones included.
 Every pull request also says which outcome it got, in a note at the top of
 its body, so the owner does not have to work it out from the labels. A
 decision carries an `IMPORTANT` alert naming its reason — a major, a pre-1.0
-package, a Python minor, an unversioned image tag — and, for a major or a
-Python minor, that it was held fourteen days and how old the release now is.
+package, an unversioned image tag — and, for a major, that it was held
+fourteen days and how old the release now is.
 A routine update carries a `NOTE` that it merges itself once its checks pass
 and waits for a person if one fails; lock file maintenance adds that it
 re-resolves within the declared ranges with no quarantine, and that a
@@ -257,17 +278,17 @@ version from commit types treats a dependency fix as a patch.
 What counts as a decision:
 
 - A major upgrade, because it is a compatibility decision rather than a
-  refresh. Three classes are exempt, because for them the decision is one the
-  checks can make: the development toolchain (workflow actions, pre-commit,
+  refresh. Four classes are exempt, because for them the decision is one the
+  checks can make: language runtimes (`go`, `golang`, `node`, `python`,
+  `rust`, in every manager that pins them, as described above), the
+  development toolchain (workflow actions, pre-commit,
   mise, asdf, nix and the Rust toolchain), npm `devDependencies`, and Python
   development groups (`[dependency-groups]`, uv's and PDM's dev dependencies).
   All of them break the pipeline inside their own pull request. Base images are
   deliberately not exempt: a major there is a change of operating system,
   which passes the checks and surfaces in production instead. The same goes for
   the runner a workflow runs on (`runs-on: ubuntu-24.04` to `ubuntu-26.04`),
-  although it lives among the workflow actions. Nor are language runtimes,
-  even where a toolchain manager or a setup action is what pins them.
-  The fourteen-day quarantine applies to every major either way, except a
+  although it lives among the workflow actions. The fourteen-day quarantine applies to every major either way, except a
   major of this preset, which was reviewed here before it was tagged.
 - A pre-1.0 minor, and a patch below 0.1, because semver gives them no
   compatibility promise. They get a branch of their own; they have to leave
@@ -276,9 +297,6 @@ What counts as a decision:
   0.x and versioned like a 1.x are exempt: `golang.org/x`, the generated
   `google.golang.org/genproto` stubs, and the OpenTelemetry contrib and
   instrumentation packages that move in lockstep with their 1.x core.
-- A Python minor, because Python versions its language on the minor: modules
-  are removed, the ABI compiled wheels target changes, and packages drop
-  support there.
 - A digest under a tag that names no version — `latest`, `alpine`, `stable` —
   because the move is whatever upstream released since, majors and schema
   migrations included, and digests carry no release date to quarantine

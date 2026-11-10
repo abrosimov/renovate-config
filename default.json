@@ -153,6 +153,22 @@
       "groupSlug": "python-runtime"
     },
     {
+      "matchDepNames": ["rust"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "groupName": "rust runtime",
+      "groupSlug": "rust-runtime"
+    },
+    {
+      "description": "A language runtime always moves forward, a feature release included, but never onto its first build: the .0 of a feature release is where the regressions its first patch fixes are found, so the update waits for that patch rather than for a person. Go and Python ship a feature release on the minor — 1.27.0, 3.14.0 — and are held off any X.Y.0. WARNING: the filter reads the version, so a pin that names no patch level — golang:1.27-alpine, python:3.14-slim, go-version: '1.27' — moves on the feature release's first day, held only by the quarantine",
+      "matchDepNames": ["go", "golang", "python"],
+      "allowedVersions": "!/^v?\\d+\\.\\d+\\.0(?:[^\\d.].*)?$/"
+    },
+    {
+      "description": "Node ships its feature release on the major and its minors are ordinary releases that often get no patch before the next one, so only the X.0.0 is held off: holding every X.Y.0 would leave Node a minor behind for good. Rust is not filtered at all, because a Rust release is a 1.Y.0 that usually never gets a 1.Y.1, and a filter would keep it from ever moving; the quarantine is what holds it",
+      "matchDepNames": ["node"],
+      "allowedVersions": "!/^v?\\d+\\.0\\.0(?:[^\\d.].*)?$/"
+    },
+    {
       "description": "Digest and pin moves keep the tag, so they are a rebuilt layer rather than an upgrade decision and belong in one branch of their own. The ageing requirement is cleared here deliberately: a digest carries no release timestamp to age against, and minimumReleaseAgeBehaviour: timestamp-required would otherwise hold every one of them indefinitely",
       "matchUpdateTypes": ["digest", "pin", "pinDigest"],
       "groupName": "digests and pins",
@@ -213,7 +229,7 @@
       "prBodyNotes": ["> [!IMPORTANT]\n> **Needs a decision: pre-1.0 package.** Below 1.0, semver allows a breaking change in a minor, and below 0.1 even in a patch, so this is not merged automatically. Read the release notes, then merge or close.{{#if isVulnerabilityAlert}}\n\n> [!CAUTION]\n> **Security fix.** The reason above still applies, but the vulnerability should not wait on it: merge promptly.{{/if}}"]
     },
     {
-      "description": "A major upgrade is a decision, not a refresh, so it opens a pull request straight away, assigned and with the checks already run, and waits there for the merge button; it is never folded into an ecosystem group. The longer quarantine is the same reasoning applied to time: a major carries the breaking change by definition, so it gets the far end of the window rather than the near one. The managers excluded here are decided by the rules below instead; they are excluded rather than overridden because addLabels accumulates and a branch cannot usefully carry both needs-decision and automerge. The note says why the pull request waits and how long it was held. WARNING: prBodyNotes accumulates across matching rules exactly as addLabels does, so the same exclusion is what keeps it off the toolchain and development majors that merge themselves; a later rule can add a note but never withdraw one. The hold is left out of the text for a security fix and for this preset's own major, because neither was held; a note cannot read minimumReleaseAge, so it tests the two cases by name. A security fix also gets its caution here, inside the note, rather than from vulnerabilityAlerts. WARNING: Renovate appends one rule per advisory with force: vulnerabilityAlerts, and a forced value replaces the accumulated one instead of adding to it, so a prBodyNotes in vulnerabilityAlerts would erase every decision note and the advisory details Renovate writes itself",
+      "description": "A major upgrade is a decision, not a refresh, so it opens a pull request straight away, assigned and with the checks already run, and waits there for the merge button; it is never folded into an ecosystem group. The longer quarantine is the same reasoning applied to time: a major carries the breaking change by definition, so it gets the far end of the window rather than the near one. The managers and the language runtimes excluded here are decided by the rules below instead; they are excluded rather than overridden because addLabels accumulates and a branch cannot usefully carry both needs-decision and automerge. The note says why the pull request waits and how long it was held. WARNING: prBodyNotes accumulates across matching rules exactly as addLabels does, so the same exclusion is what keeps it off the toolchain and development majors that merge themselves; a later rule can add a note but never withdraw one. The hold is left out of the text for a security fix and for this preset's own major, because neither was held; a note cannot read minimumReleaseAge, so it tests the two cases by name. A security fix also gets its caution here, inside the note, rather than from vulnerabilityAlerts. WARNING: Renovate appends one rule per advisory with force: vulnerabilityAlerts, and a forced value replaces the accumulated one instead of adding to it, so a prBodyNotes in vulnerabilityAlerts would erase every decision note and the advisory details Renovate writes itself",
       "matchUpdateTypes": ["major"],
       "matchManagers": [
         "!github-actions",
@@ -225,13 +241,14 @@
         "!npm",
         "!pep621"
       ],
+      "matchDepNames": ["!go", "!golang", "!node", "!python", "!rust"],
       "minimumReleaseAge": "14 days",
       "automerge": false,
       "addLabels": ["needs-decision"],
       "prBodyNotes": ["> [!IMPORTANT]\n> **Needs a decision: major update.** A major carries breaking changes by definition, so this is not merged automatically.{{#unless (or isVulnerabilityAlert (equals packageName 'abrosimov/renovate-config'))}} It was held for 14 days{{#if newVersionAgeInDays}}; {{depName}} {{newVersion}} is {{newVersionAgeInDays}} days old{{/if}}.{{/unless}} Read the release notes, then merge or close.{{#if isVulnerabilityAlert}}\n\n> [!CAUTION]\n> **Security fix.** The reason above still applies, but the vulnerability should not wait on it: merge promptly.{{/if}}"]
     },
     {
-      "description": "The same decision for npm and pyproject, which are held out of the rule above so that development dependencies can be told apart. WARNING: the type is negated rather than listed, because npm also extracts engines, packageManager, volta, overrides and resolutions, and pyproject extracts requires-python and build-system.requires; a positive list of runtime types would drop those out of every major rule and leave them automerging on the inherited default. It carries the same note as the rule above",
+      "description": "The same decision for npm and pyproject, which are held out of the rule above so that development dependencies can be told apart. WARNING: the type is negated rather than listed, because npm also extracts engines, packageManager, volta, overrides and resolutions, and pyproject extracts requires-python and build-system.requires; a positive list of runtime types would drop those out of every major rule and leave them automerging on the inherited default. The runtimes among them — node in engines, python in requires-python — are excluded by name for the reason the rule above gives. It carries the same note as the rule above",
       "matchUpdateTypes": ["major"],
       "matchManagers": ["npm", "pep621"],
       "matchDepTypes": [
@@ -240,13 +257,14 @@
         "!tool.uv.dev-dependencies",
         "!tool.pdm.dev-dependencies"
       ],
+      "matchDepNames": ["!go", "!golang", "!node", "!python", "!rust"],
       "minimumReleaseAge": "14 days",
       "automerge": false,
       "addLabels": ["needs-decision"],
       "prBodyNotes": ["> [!IMPORTANT]\n> **Needs a decision: major update.** A major carries breaking changes by definition, so this is not merged automatically.{{#unless (or isVulnerabilityAlert (equals packageName 'abrosimov/renovate-config'))}} It was held for 14 days{{#if newVersionAgeInDays}}; {{depName}} {{newVersion}} is {{newVersionAgeInDays}} days old{{/if}}.{{/unless}} Read the release notes, then merge or close.{{#if isVulnerabilityAlert}}\n\n> [!CAUTION]\n> **Security fix.** The reason above still applies, but the vulnerability should not wait on it: merge promptly.{{/if}}"]
     },
     {
-      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own pull request, where a red check holds the merge in front of its assignee without anybody being asked in advance. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production. Language runtimes are not here either, although these managers extract them, because the runtime a setup action or a toolchain file installs is the one the product is built and tested on. Nor is the runner a workflow runs on: ubuntu-24.04 to ubuntu-26.04 in runs-on is a change of operating system for every job, the same move as a base image major, and the workflow manager extracts it alongside the actions",
+      "description": "A major in the development toolchain breaks the pipeline rather than the product, and breaks it inside its own pull request, where a red check holds the merge in front of its assignee without anybody being asked in advance. Base images are deliberately not here: a major there is a change of operating system, which passes the checks and shows up in production. Language runtimes are not here either, although these managers extract them, because a runtime is pinned in base images and manifests as well and its own rule below covers every manager at once. Nor is the runner a workflow runs on: ubuntu-24.04 to ubuntu-26.04 in runs-on is a change of operating system for every job, the same move as a base image major, and the workflow manager extracts it alongside the actions",
       "matchUpdateTypes": ["major"],
       "matchManagers": [
         "github-actions",
@@ -256,7 +274,7 @@
         "nix",
         "rust-toolchain"
       ],
-      "matchDepNames": ["!go", "!golang", "!node", "!python"],
+      "matchDepNames": ["!go", "!golang", "!node", "!python", "!rust"],
       "matchDatasources": ["!github-runners"],
       "minimumReleaseAge": "14 days",
       "automerge": true,
@@ -279,21 +297,13 @@
       "prBodyNotes": ["> [!NOTE]\n> **Merges itself** (squash) once every check is green. If a check fails, it waits for you."]
     },
     {
-      "description": "The runtime majors the toolchain rule leaves out, decided like any other major, and carrying the same note",
+      "description": "A language runtime is always taken forward, its major included, in every manager that pins it: a repository that falls behind its language only faces a larger jump later, and the checks that run on the pull request are what answer whether the code still builds on it. The first build of a feature release is held off by the allowedVersions rules above rather than by a person, and the major keeps the longer quarantine",
       "matchUpdateTypes": ["major"],
-      "matchManagers": [
-        "github-actions",
-        "pre-commit",
-        "mise",
-        "asdf",
-        "nix",
-        "rust-toolchain"
-      ],
-      "matchDepNames": ["go", "golang", "node", "python"],
+      "matchDepNames": ["go", "golang", "node", "python", "rust"],
       "minimumReleaseAge": "14 days",
-      "automerge": false,
-      "addLabels": ["needs-decision"],
-      "prBodyNotes": ["> [!IMPORTANT]\n> **Needs a decision: major update.** A major carries breaking changes by definition, so this is not merged automatically.{{#unless (or isVulnerabilityAlert (equals packageName 'abrosimov/renovate-config'))}} It was held for 14 days{{#if newVersionAgeInDays}}; {{depName}} {{newVersion}} is {{newVersionAgeInDays}} days old{{/if}}.{{/unless}} Read the release notes, then merge or close.{{#if isVulnerabilityAlert}}\n\n> [!CAUTION]\n> **Security fix.** The reason above still applies, but the vulnerability should not wait on it: merge promptly.{{/if}}"]
+      "automerge": true,
+      "addLabels": ["automerge"],
+      "prBodyNotes": ["> [!NOTE]\n> **Merges itself** (squash) once every check is green. If a check fails, it waits for you."]
     },
     {
       "description": "The runner majors the toolchain rule leaves out, decided like a base image major and carrying the same note as any other major. WARNING: the runner is matched on its datasource rather than its name, because the workflow manager names it by its bare operating system — ubuntu, windows, macos — and names a job's container: image the same way, so a name would catch the ubuntu image as well. Every runner move is a major in practice: the images are versioned by operating system release, which docker versioning reads as the major",
@@ -305,15 +315,10 @@
       "prBodyNotes": ["> [!IMPORTANT]\n> **Needs a decision: major update.** A major carries breaking changes by definition, so this is not merged automatically.{{#unless (or isVulnerabilityAlert (equals packageName 'abrosimov/renovate-config'))}} It was held for 14 days{{#if newVersionAgeInDays}}; {{depName}} {{newVersion}} is {{newVersionAgeInDays}} days old{{/if}}.{{/unless}} Read the release notes, then merge or close.{{#if isVulnerabilityAlert}}\n\n> [!CAUTION]\n> **Security fix.** The reason above still applies, but the vulnerability should not wait on it: merge promptly.{{/if}}"]
     },
     {
-      "description": "Python versions its language on the minor: 3.13 to 3.14 removes deprecated modules, changes the ABI that compiled wheels target and is where packages drop support, so it is a major in everything but name. It leaves the runtime group for the reason the pre-1.0 rule gives. Its note explains the minor, because a needs-decision label on a minor otherwise reads like a mistake, and the security caution the major rule's description explains",
+      "description": "Python versions its language on the minor: 3.13 to 3.14 removes deprecated modules, changes the ABI that compiled wheels target and is where packages drop support, so it is a major in everything but name and keeps a major's quarantine. It is still taken forward like any runtime and merges itself in the python runtime group",
       "matchDepNames": ["python"],
       "matchUpdateTypes": ["minor"],
-      "groupName": "python runtime minor",
-      "groupSlug": "python-runtime-minor",
-      "minimumReleaseAge": "14 days",
-      "automerge": false,
-      "addLabels": ["needs-decision"],
-      "prBodyNotes": ["> [!IMPORTANT]\n> **Needs a decision: Python minor.** Python versions the language on the minor: a minor removes deprecated modules, changes the ABI that compiled wheels target and is where packages drop support, so this is not merged automatically.{{#unless isVulnerabilityAlert}} It was held for 14 days, as a major is.{{/unless}} Check that every dependency supports the new version, then merge or close.{{#if isVulnerabilityAlert}}\n\n> [!CAUTION]\n> **Security fix.** The reason above still applies, but the vulnerability should not wait on it: merge promptly.{{/if}}"]
+      "minimumReleaseAge": "14 days"
     },
     {
       "description": "A major of this preset is still a decision, because it is what a consuming repository has to act on, but it is not a third party's breaking change, so it skips the quarantine for the reason the rule for its minors gives. Only the age is cleared: the major rules above still withhold automerge and label it. WARNING: it must stay below every rule that sets the fourteen days, because the last matching rule decides minimumReleaseAge",
@@ -330,10 +335,9 @@
       "prBodyNotes": ["> [!NOTE]\n> **Merges itself** (squash) once every check is green. If a check fails, it waits for you."]
     },
     {
-      "description": "Minor is qualified because the pre-1.0 and python runtime rules above withhold automerge from it",
+      "description": "Minor is qualified because the pre-1.0 rule above withholds automerge from it",
       "matchUpdateTypes": ["minor"],
       "matchCurrentVersion": "!/^v?0\\./",
-      "matchDepNames": ["!python"],
       "addLabels": ["automerge"],
       "prBodyNotes": ["> [!NOTE]\n> **Merges itself** (squash) once every check is green. If a check fails, it waits for you."]
     },
