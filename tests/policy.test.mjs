@@ -15,6 +15,9 @@ const { applyPackageRules } = await import(
 // Notes are rendered by Renovate's own template engine too, so a helper or a
 // field it does not expose fails here rather than on a pull request.
 const { compile } = await import(pathToFileURL(join(renovateDir, 'dist/util/template/index.js')).href);
+// allowedVersions is applied by the lookup's own release filter through this
+// predicate (lib/workers/repository/process/lookup/filter.ts).
+const { getRegexPredicate } = await import(pathToFileURL(join(renovateDir, 'dist/util/string-match.js')).href);
 
 const preset = JSON.parse(readFileSync(new URL('../default.json', import.meta.url), 'utf8'));
 
@@ -32,6 +35,7 @@ async function resolve(upgrade, appendedRules = []) {
     decision: labels.includes('needs-decision'),
     automergeLabel: labels.includes('automerge'),
     minimumReleaseAge: config.minimumReleaseAge,
+    allowedVersions: config.allowedVersions,
     notes,
     rendered: notes.map((note) => compile(note, { ...config, ...upgrade }).trim()),
     prLabels: [...new Set([...(config.labels ?? []), ...labels])].sort(),
@@ -42,7 +46,6 @@ async function resolve(upgrade, appendedRules = []) {
 const NOTE = {
   pre1: '**Needs a decision: pre-1.0 package.**',
   major: '**Needs a decision: major update.**',
-  pythonMinor: '**Needs a decision: Python minor.**',
   unversioned: '**Needs a decision: unversioned image tag.**',
   automerge: '**Merges itself**',
   lockFile: '**Lock file maintenance**',
@@ -152,15 +155,19 @@ const cases = [
   ['stable Python patch', pep621('pydantic', 'project.dependencies', '2.10.1', 'patch'), { ...SILENT, groupSlug: 'python' }],
   ['stable npm minor', npm('react', 'dependencies', '19.2.0', 'minor'), { ...SILENT, groupSlug: 'javascript' }],
 
-  ['Python runtime minor in a base image', docker('dockerfile', 'python', '3.13-slim', '3.13', 'minor'), { ...DECISION, groupSlug: 'python-runtime-minor' }],
-  ['Python runtime minor in a toolchain file', { manager: 'mise', datasource: 'github-tags', depName: 'python', packageName: 'python/cpython', currentValue: '3.13', currentVersion: '3.13', updateType: 'minor' }, { ...DECISION, groupSlug: 'python-runtime-minor' }],
+  ['Python runtime minor in a base image', docker('dockerfile', 'python', '3.13-slim', '3.13', 'minor'), { ...SILENT, groupSlug: 'python-runtime', minimumReleaseAge: '14 days' }],
+  ['Python runtime minor in a toolchain file', { manager: 'mise', datasource: 'github-tags', depName: 'python', packageName: 'python/cpython', currentValue: '3.13', currentVersion: '3.13', updateType: 'minor' }, { ...SILENT, groupSlug: 'python-runtime', minimumReleaseAge: '14 days' }],
   ['Python runtime patch', docker('dockerfile', 'python', '3.13.1-slim', '3.13.1', 'patch'), { ...SILENT, groupSlug: 'python-runtime' }],
-  ['Node runtime major in a base image', docker('dockerfile', 'node', '22-alpine', '22', 'major'), { ...DECISION, groupSlug: 'node-runtime' }],
-  ['Node runtime major in a toolchain file', { manager: 'mise', datasource: 'node-version', depName: 'node', packageName: 'node', currentValue: '22', currentVersion: '22', updateType: 'major' }, { ...DECISION, groupSlug: 'node-runtime' }],
-  ['Node runtime major in a setup action', { manager: 'github-actions', datasource: 'github-releases', depType: 'uses-with', depName: 'node', packageName: 'actions/node-versions', currentValue: '22', currentVersion: '22', updateType: 'major' }, { ...DECISION, groupSlug: 'node-runtime' }],
-  ['Node runtime major in engines', npm('node', 'engines', '22.0.0', 'major'), { ...DECISION, groupSlug: 'node-runtime' }],
+  ['Python runtime major in requires-python', pep621('python', 'requires-python', '3.13.1', 'major'), { ...SILENT, groupSlug: 'python-runtime', minimumReleaseAge: '14 days' }],
+  ['Node runtime major in a base image', docker('dockerfile', 'node', '22-alpine', '22', 'major'), { ...SILENT, groupSlug: 'node-runtime', minimumReleaseAge: '14 days' }],
+  ['Node runtime major in a toolchain file', { manager: 'mise', datasource: 'node-version', depName: 'node', packageName: 'node', currentValue: '22', currentVersion: '22', updateType: 'major' }, { ...SILENT, groupSlug: 'node-runtime', minimumReleaseAge: '14 days' }],
+  ['Node runtime major in a setup action', { manager: 'github-actions', datasource: 'github-releases', depType: 'uses-with', depName: 'node', packageName: 'actions/node-versions', currentValue: '22', currentVersion: '22', updateType: 'major' }, { ...SILENT, groupSlug: 'node-runtime', minimumReleaseAge: '14 days' }],
+  ['Node runtime major in engines', npm('node', 'engines', '22.0.0', 'major'), { ...SILENT, groupSlug: 'node-runtime', minimumReleaseAge: '14 days' }],
   ['Go runtime minor in go.mod', { manager: 'gomod', datasource: 'golang-version', depType: 'golang', depName: 'go', packageName: 'go', currentValue: '1.27.0', currentVersion: '1.27.0', updateType: 'minor' }, { ...SILENT, groupSlug: 'go-runtime' }],
   ['Go runtime minor in a base image', docker('dockerfile', 'golang', '1.27-alpine', '1.27', 'minor'), { ...SILENT, groupSlug: 'go-runtime' }],
+  ['Rust runtime minor in a toolchain file', { manager: 'rust-toolchain', datasource: 'github-releases', depName: 'rust', packageName: 'rust-lang/rust', currentValue: '1.90.0', currentVersion: '1.90.0', updateType: 'minor' }, { ...SILENT, groupSlug: 'rust-runtime' }],
+  ['Rust runtime minor in a base image', docker('dockerfile', 'rust', '1.90-slim', '1.90', 'minor'), { ...SILENT, groupSlug: 'rust-runtime' }],
+  ['Rust runtime major in a toolchain file', { manager: 'rust-toolchain', datasource: 'github-releases', depName: 'rust', packageName: 'rust-lang/rust', currentValue: '1.90.0', currentVersion: '1.90.0', updateType: 'major' }, { ...SILENT, groupSlug: 'rust-runtime', minimumReleaseAge: '14 days' }],
 
   ['workflow action major', { manager: 'github-actions', datasource: 'github-tags', depType: 'action', depName: 'actions/checkout', packageName: 'actions/checkout', currentValue: 'v6', currentVersion: 'v6', updateType: 'major' }, { ...SILENT, minimumReleaseAge: '14 days' }],
   ['Ubuntu runner major', runner('ubuntu', '24.04'), { ...DECISION, minimumReleaseAge: '14 days' }],
@@ -210,6 +217,37 @@ test('the label agrees with the behaviour for every case', async () => {
     assert.equal(decision, !automerge, `${name}: needs-decision label`);
   }
 });
+
+// A runtime moves forward on its own, but never onto the first build of a
+// feature release. The filter only sees what the version names, so a pin with
+// no patch level is not held, and that gap is pinned here alongside the rest.
+const goVersion = { manager: 'gomod', datasource: 'golang-version', depType: 'golang', depName: 'go', packageName: 'go' };
+const nodeAction = { manager: 'github-actions', datasource: 'github-releases', depType: 'uses-with', depName: 'node', packageName: 'actions/node-versions' };
+const rustToolchain = { manager: 'rust-toolchain', datasource: 'github-releases', depName: 'rust', packageName: 'rust-lang/rust' };
+for (const [name, upgrade, version, allowed] of [
+  ['Go feature release', goVersion, '1.28.0', false],
+  ['Go feature release first patch', goVersion, '1.28.1', true],
+  ['Go two-digit patch', goVersion, '1.28.10', true],
+  ['golang image feature release', docker('dockerfile', 'golang', '1.27.3-alpine', '1.27.3', 'minor'), '1.28.0-alpine3.22', false],
+  ['golang image first patch', docker('dockerfile', 'golang', '1.27.3-alpine', '1.27.3', 'minor'), '1.28.1-alpine3.22', true],
+  ['golang image with no patch level, not held', docker('dockerfile', 'golang', '1.27-alpine', '1.27', 'minor'), '1.28-alpine', true],
+  ['Python feature release', pep621('python', 'requires-python', '3.13.1', 'minor'), '3.14.0', false],
+  ['python image feature release', docker('dockerfile', 'python', '3.13.1-slim', '3.13.1', 'minor'), '3.14.0-slim', false],
+  ['Python feature release first patch', pep621('python', 'requires-python', '3.13.1', 'minor'), '3.14.1', true],
+  ['Node major', npm('node', 'engines', '24.11.0', 'major'), '26.0.0', false],
+  ['Node major with v prefix', npm('node', 'engines', '24.11.0', 'major'), 'v26.0.0', false],
+  ['Node major in a setup action', nodeAction, '26.0.0-19876543210', false],
+  ['Node major first patch', npm('node', 'engines', '24.11.0', 'major'), '26.0.1', true],
+  ['Node minor', npm('node', 'engines', '24.11.0', 'minor'), '26.1.0', true],
+  ['Rust release, which never gets a patch', rustToolchain, '1.91.0', true],
+  ['a library feature release', gomod('github.com/jackc/pgx/v5', 'v5.9.2', 'minor'), 'v5.10.0', true],
+]) {
+  test(`${name} ${version} is ${allowed ? 'allowed' : 'held off'}`, async () => {
+    const { allowedVersions } = await resolve(upgrade);
+    const actual = allowedVersions === undefined ? true : getRegexPredicate(allowedVersions)(version);
+    assert.equal(actual, allowed, `allowedVersions: ${allowedVersions}`);
+  });
+}
 
 for (const [version, preOne] of [
   ['0.0.1', true],
@@ -330,10 +368,11 @@ test('no update across managers, versions and update types both asks for a decis
     mise: 'github-tags',
     'pre-commit': 'github-tags',
     cargo: 'crate',
+    'rust-toolchain': 'github-releases',
     'renovate-config': 'github-tags',
     regex: 'go',
   };
-  const names = ['example/pkg', 'golang.org/x/net', `${core}pdata`, `${contrib}receiver/x`, 'opentelemetry-instrumentation-grpc', 'go', 'node', 'python', 'abrosimov/renovate-config'];
+  const names = ['example/pkg', 'golang.org/x/net', `${core}pdata`, `${contrib}receiver/x`, 'opentelemetry-instrumentation-grpc', 'go', 'golang', 'node', 'python', 'rust', 'abrosimov/renovate-config'];
   const versions = [['0.0.3', '0.0.3'], ['v0.5.0', 'v0.5.0'], ['1.2.0', '1.2.0'], ['latest', undefined], ['17-alpine', '17']];
   const updateTypes = ['major', 'minor', 'patch', 'digest', 'pin', 'pinDigest', 'lockFileMaintenance'];
   const depTypes = [undefined, 'dependencies', 'devDependencies', 'dependency-groups'];
@@ -378,7 +417,7 @@ test('a decision opens a pull request rather than waiting for a dashboard tick',
 // prBodyNotes accumulates across matching rules like addLabels, so a note on
 // the wrong rule lands on pull requests it does not describe.
 test('every pull request explains itself, and only in the words of its own outcome', async () => {
-  const decisionNotes = new Set(['pre1', 'major', 'pythonMinor', 'unversioned']);
+  const decisionNotes = new Set(['pre1', 'major', 'unversioned']);
   for (const [name, upgrade] of cases) {
     const { decision, automergeLabel, notes } = await resolve(upgrade);
     const kinds = noteKinds(notes);
@@ -392,10 +431,10 @@ const noteCases = [
   ['pre-1.0 npm minor', npm('lucide-react', 'dependencies', '0.563.0', 'minor'), ['pre1']],
   ['0.0.x patch', pep621('pipecat-ai', 'project.dependencies', '0.0.105', 'patch'), ['pre1']],
   ['Go module major', gomod('github.com/jackc/pgx/v5', 'v5.9.2', 'major'), ['major']],
-  ['Node runtime major in a toolchain file', { manager: 'mise', datasource: 'node-version', depName: 'node', packageName: 'node', currentValue: '22', currentVersion: '22', updateType: 'major' }, ['major']],
+  ['Node runtime major in a toolchain file, which merges itself', { manager: 'mise', datasource: 'node-version', depName: 'node', packageName: 'node', currentValue: '22', currentVersion: '22', updateType: 'major' }, ['automerge']],
   ['workflow action major, which merges itself', { manager: 'github-actions', datasource: 'github-tags', depType: 'action', depName: 'actions/checkout', packageName: 'actions/checkout', currentValue: 'v6', currentVersion: 'v6', updateType: 'major' }, ['automerge']],
   ['npm development dependency major, which merges itself', npm('vite', 'devDependencies', '7.3.1', 'major'), ['automerge']],
-  ['Python runtime minor in a base image', docker('dockerfile', 'python', '3.13-slim', '3.13', 'minor'), ['pythonMinor']],
+  ['Python runtime minor in a base image, which merges itself', docker('dockerfile', 'python', '3.13-slim', '3.13', 'minor'), ['automerge']],
   ['digest under latest', docker('docker-compose', 'temporalio/auto-setup', 'latest', undefined, 'digest'), ['unversioned']],
   ['digest under a versioned tag', docker('docker-compose', 'postgres', '17-alpine', '17', 'digest'), ['automerge']],
   ['stable Python patch', pep621('pydantic', 'project.dependencies', '2.10.1', 'patch'), ['automerge']],
