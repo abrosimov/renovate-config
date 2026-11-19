@@ -194,6 +194,28 @@ const cases = [
   ['lock file maintenance', { manager: 'pep621', updateType: 'lockFileMaintenance' }, { ...SILENT, minimumReleaseAge: null }],
 ];
 
+// pinDigests decides whether the lookup proposes a pinDigest update at all
+// (lib/workers/repository/process/lookup/index.ts), and the lookup reads it
+// from the dependency's configuration after the pre-lookup rules
+// (lib/workers/repository/process/fetch.ts), before any update has a type.
+const preLookup = async ({ updateType, ...dep }, repository) =>
+  (await applyPackageRules({ ...preset, ...repository, ...dep }, 'pre-lookup')).pinDigests;
+
+test('a preset reference is never pinned to a digest, even in a repository that pins digests', async () => {
+  for (const name of ['abrosimov/renovate-config', 'example/renovate-config']) {
+    assert.equal(await preLookup(presetPin(name, 'v3.5.0'), { pinDigests: true }), false, name);
+  }
+});
+
+test('a repository that pins digests still pins everything other than a preset', async () => {
+  for (const dep of [
+    docker('docker-compose', 'postgres', '17-alpine', '17'),
+    { manager: 'github-actions', datasource: 'github-tags', depType: 'action', depName: 'actions/checkout', packageName: 'actions/checkout', currentValue: 'v6' },
+  ]) {
+    assert.equal(await preLookup(dep, { pinDigests: true }), true, dep.manager);
+  }
+});
+
 for (const [name, upgrade, expected] of cases) {
   test(name, async () => {
     const actual = await resolve(upgrade);

@@ -134,6 +134,11 @@
       "addLabels": ["tooling"]
     },
     {
+      "description": "A preset is referenced by its tag inside an extends string, where the manager has nowhere to write a digest, so a digest pin of one can only fail: with pinDigests on in a consuming repository Renovate proposes it anyway, and the branch errors on every run and stays listed under Errored on the dashboard. Digest pinning is therefore switched off for the manager as a whole, a third party's preset included, while its tag updates carry on as before. WARNING: the rule names no update type on purpose, because pinDigests is read during the lookup, before an update has a type, and a rule that matched pinDigest would apply only once the update it was meant to prevent already existed",
+      "matchManagers": ["renovate-config"],
+      "pinDigests": false
+    },
+    {
       "description": "A language runtime is pinned in several files at once — the go directive and the golang image, a setup action's input, a version file, a toolchain manager — and each would otherwise raise a branch of its own. Grouping it by name across managers moves every pin in one commit, so a build never mixes two versions of the same runtime. Majors still split off into a branch of their own, because separateMajorMinor applies inside a group",
       "matchDepNames": ["go", "golang"],
       "matchUpdateTypes": ["major", "minor", "patch"],

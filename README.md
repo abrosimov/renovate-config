@@ -69,6 +69,15 @@ but still waits for its merge button, as described below. The exemption names
 this repository: the manager tracks any preset pinned to a tag, and a third
 party's was reviewed nowhere here, so it ages like any other dependency.
 
+The pin is a tag and never a digest. A repository that sets `pinDigests: true`
+would otherwise be offered a digest pin of the preset reference as well, and
+the manager has nowhere in an `extends` string to write one, so that branch
+fails on every run and stays under Errored on the Dependency Dashboard. The
+preset switches `pinDigests` off for the `renovate-config` manager, any
+preset included, and leaves its tag updates as they are. The rule names no
+update type, because Renovate reads `pinDigests` while it looks the dependency
+up, before an update has a type to match on.
+
 A pull request is judged by the policy its repository extends at the time,
 not by the one it proposes. A repository pinned to a release older than an
 exemption therefore still holds the update that would bring it, and the first
