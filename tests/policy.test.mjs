@@ -561,8 +561,8 @@ test('titles carry a semantic prefix in every repository', () => {
 });
 
 test('the dashboard header explains the sections and imitates none of its controls', () => {
-  const header = preset.dependencyDashboardHeader;
-  assert.ok(header, 'dependencyDashboardHeader must be set');
+  const header = preset.dependencyDashboard?.header;
+  assert.ok(header, 'dependencyDashboard.header must be set');
   for (const section of ['Pending Status Checks', 'Open']) {
     assert.ok(header.includes(`**${section}**`), section);
   }
