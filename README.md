@@ -4,11 +4,11 @@ Shared Renovate policy for the repositories under `abrosimov` and
 `abrosimov-tech`. One place to change, every repository follows.
 
 Renovate runs self-hosted, on a scheduled rootless container, once per GitHub
-App installation. Its onboarding pull request proposes a `renovate.json` that
+App installation. Its onboarding pull request proposes a `renovate.json5` that
 does nothing but reference this preset, so each repository keeps a visible
 record that Renovate is enabled while the policy itself stays central:
 
-```json
+```json5
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>abrosimov/renovate-config#vX.Y.Z"]
@@ -425,7 +425,7 @@ Node 26 that was 37.440.7, two years old. Asking for the exact version leaves
 npm nothing to fall back to, so a mismatch fails the install instead of
 passing the checks against an engine nobody runs.
 
-The repository also carries its own `renovate.json` pointing at its own preset,
+The repository also carries its own `renovate.json5` pointing at its own preset,
 so the policy is applied to the workflow it just acquired and is exercised
 against live traffic rather than only asserted. It is the one place that
 extends the branch rather than a tag, because a preset that pinned itself
