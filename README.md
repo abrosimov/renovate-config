@@ -270,7 +270,10 @@ decision adds a `CAUTION` to its reason, to merge it promptly anyway; one that
 merges itself needs nothing from anybody and adds nothing beyond the advisory
 details Renovate writes itself. Notes accumulate across every rule that
 matches, as labels do, which is why each one sits on exactly the rules that
-set its outcome.
+set its outcome. `prBodyTemplate` puts the notes first, above the table of
+updates, and `prFooter` replaces Renovate's own footer with a pointer to this
+policy. The Dependency Dashboard carries the `dependencies` label, so it can be
+filtered out of a repository's issues together with the pull requests.
 
 WARNING: the caution lives inside the decision notes rather than in
 `vulnerabilityAlerts`. Renovate raises a security fix by appending a rule per

@@ -33,8 +33,12 @@
 
   "dependencyDashboard": {
     "header": "Updates under the shared policy [abrosimov/renovate-config](https://github.com/abrosimov/renovate-config).\n\n- **Pending Status Checks** — the release is still in quarantine (7 days, 14 for a major). Ticking its box opens the pull request now and **skips the quarantine**: do it only for a release you trust.\n- **Open** — `needs-decision` pull requests wait for you; `automerge` pull requests merge themselves once their checks pass.\n- **Stuck?** Tick the pull request's box under Open to rebase or retry it.",
-    "osvVulnerabilitySummary": "all"
+    "osvVulnerabilitySummary": "all",
+    "labels": ["dependencies"]
   },
+
+  "prBodyTemplate": "{{{header}}}{{{notes}}}{{{table}}}{{{warnings}}}{{{changelogs}}}{{{configDescription}}}{{{controls}}}{{{footer}}}",
+  "prFooter": "Raised by Renovate under the shared policy [abrosimov/renovate-config](https://github.com/abrosimov/renovate-config). The note at the top says whether this merges itself or waits for a decision.",
 
   "postUpdateOptions": [
     "gomodTidy",
