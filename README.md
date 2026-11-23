@@ -220,6 +220,19 @@ The filter reads the version, so a pin with no patch level —
 feature release's first day, held only by the quarantine. A runtime major and
 a Python minor keep the fourteen-day quarantine of a major.
 
+A Go module is only ever moved onto a release, never onto an rc, a beta, an
+alpha or any other pre-release: `allowedVersions` admits `vX.Y.Z` and
+`vX.Y.Z+incompatible` and nothing else, for every `require` and `replace`
+in `go.mod`, and for an indirect module that a `tool` directive names, which
+Renovate updates although it leaves the other indirect lines alone. Renovate's own `ignoreUnstable` is not enough here. Once
+`go mod tidy` raises a module onto a pseudo-version, Renovate looks it up
+with loose versioning, which treats every version as stable, and offers
+`v1.37.0-rc.1` over `v1.36.13-0.20261016172727-e9ee2a76ab8e`. A move from one
+pseudo-version to a later one is a digest update rather than a release and is
+not filtered, so a module that has no releases still moves. The generated
+SDKs of the Buf Schema Registry (`buf.build/gen/...`) are left out, because
+every version they publish has the form of a pre-release.
+
 ## Merging and triage
 
 The policy sorts every update into one of three outcomes, and only the last

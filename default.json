@@ -180,6 +180,13 @@
       "allowedVersions": "!/^v?\\d+\\.0\\.0(?:[^\\d.].*)?$/"
     },
     {
+      "description": "A Go module is only ever moved onto a release: an rc, a beta, an alpha or any other pre-release is a build its own authors do not yet stand behind. ignoreUnstable cannot be relied on for this, because a module that go mod tidy has raised onto a pseudo-version is looked up with loose versioning, which treats every version as stable, so v1.37.0-rc.1 would be offered over v1.36.13-0.20261016172727-e9ee2a76ab8e. The filter reads the version instead, whatever the current one is. +incompatible is build metadata, not a pre-release, and stays allowed. An indirect module is included because Renovate updates one that a tool directive names, such as buf, although it leaves the other indirect lines alone. A move from one pseudo-version to a later one is a digest update rather than a release and is not filtered. The generated SDKs of the Buf Schema Registry are left out, because every version they publish has the form of a pre-release, and the filter would keep them from moving at all. WARNING: allowedVersions is not merged across rules, so a later rule that sets it for a Go module replaces this filter rather than adding to it",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["require", "replace", "indirect"],
+      "matchPackageNames": ["!buf.build/gen/**"],
+      "allowedVersions": "/^v\\d+\\.\\d+\\.\\d+(?:\\+incompatible)?$/"
+    },
+    {
       "description": "Digest and pin moves keep the tag, so they are a rebuilt layer rather than an upgrade decision and belong in one branch of their own. The ageing requirement is cleared here deliberately: a digest carries no release timestamp to age against, and minimumReleaseAgeBehaviour: timestamp-required would otherwise hold every one of them indefinitely",
       "matchUpdateTypes": ["digest", "pin", "pinDigest"],
       "groupName": "digests and pins",
